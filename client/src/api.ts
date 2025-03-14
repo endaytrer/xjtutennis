@@ -39,3 +39,8 @@ export class IdClosure {
         }
     }
 }
+
+export interface Version {
+    MainVersion: string
+    ReserverVersion: string | null
+}
