@@ -1,10 +1,10 @@
 import React, { useEffect, useState } from "react";
-import { request, RequestErr } from "./request";
+import { request, RequestErr } from "../request";
 
-import logo from "./assets/regular-no-gradient-8x.png"
-import darkLogo from "./assets/dark-logo-8x.png"
-import { Version } from "./api";
-import { dialog } from "./Dialog";
+import logo from "../assets/regular-no-gradient-8x.png"
+import darkLogo from "../assets/dark-logo-8x.png"
+import { Version } from "../api";
+import { dialog } from "../components/Dialog";
 
 async function login(e: React.FormEvent, User: string, Passwd: string, setErrorMsg: (msg: string) => void) {
     e.preventDefault();
@@ -64,7 +64,6 @@ function Login() {
             </div>
             <div className="self-center mt-4 text-xs text-gray-400 dark:text-gray-500">
                 <span>XJTUTennis - {version?.MainVersion === "unknown" ? "development server" : version?.MainVersion} {version?.ReserverVersion ? `, with reserver ${version.ReserverVersion}` : ", without reserver"}</span>
-                
             </div>
         </form>
         </main>

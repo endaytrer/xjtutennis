@@ -1,4 +1,5 @@
 import { useState } from "react";
+import App from "../components/App";
 
 function TennisCourt(props: {scale: number, linewidth: number, outerColor: string, innerColor: string, courtNumber: number}) {
     const upperText = `Court ${props.courtNumber}`;
@@ -202,4 +203,6 @@ function People() {
 }
 
 
-export default People;
+export default function PeoplePage() {
+    return <App><People /></App>
+}
