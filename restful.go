@@ -114,6 +114,11 @@ func decodeParams[T interface{}](params map[string]interface{}) (*T, error) {
 	}
 	return &param, nil
 }
+func restVersion(s *SessionManager, c *gin.Context) {
+	makeResponse(s, c, func(s *SessionManager, _ map[string]interface{}) (interface{}, error) {
+		return s.Version()
+	})
+}
 func restLogin(s *SessionManager, c *gin.Context) {
 	makeResponse(s, c, func(s *SessionManager, params map[string]interface{}) (interface{}, error) {
 		param, err := decodeParams[LoginParams](params)
@@ -195,6 +200,7 @@ func ServeHTTP(s *SessionManager, port int) {
 	r.POST("/checkYzm", func(c *gin.Context) {
 		c.Data(200, "text/plain", []byte("true"))
 	})
+	r.GET("/api/version", func(c *gin.Context) { restVersion(s, c) })
 	r.GET("/api/login", func(c *gin.Context) { restGetLoginAccount(s, c) })
 	r.POST("/api/login", func(c *gin.Context) { restLogin(s, c) })
 	r.DELETE("/api/login", func(c *gin.Context) { restSignOut(s, c) })
