@@ -13,7 +13,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/endaytrer/court_reserver"
+	"github.com/endaytrer/court_reserver_interface"
+	"github.com/endaytrer/court_reserver_interface/captcha_solver"
 	"github.com/endaytrer/xjtuorg"
 )
 
@@ -95,18 +96,25 @@ type Session struct {
 } // write-through cache of user_data.csv
 
 type SessionManager struct {
-	accounts      []Account
-	account_mutex sync.RWMutex
-	sessions      sync.Map
-	conn          *sql.Conn
-	timeZone      *time.Location
-	captchaSolver court_reserver.CaptchaSolver
+	accounts       []Account
+	account_mutex  sync.RWMutex
+	sessions       sync.Map
+	conn           *sql.Conn
+	timeZone       *time.Location
+	captchaSolver  captcha_solver.CaptchaSolver
+	reserverPlugin *CourtReserverPlugin
 }
 
 const user_data_file = "user_data.csv"
 const account_login_expiry = 24 * time.Hour
 
-func NewSessionManager(conn *sql.Conn, captcha_solver court_reserver.CaptchaSolver) (*SessionManager, error) {
+type ParseError struct{}
+
+func (t ParseError) Error() string {
+	return "Error: ParseError"
+}
+
+func NewSessionManager(conn *sql.Conn, captcha_solver captcha_solver.CaptchaSolver, court_reserver_plugin *CourtReserverPlugin) (*SessionManager, error) {
 	time_zone, err := time.LoadLocation("Asia/Shanghai")
 	if err != nil {
 		panic("Invalid time zone")
@@ -124,7 +132,7 @@ func NewSessionManager(conn *sql.Conn, captcha_solver court_reserver.CaptchaSolv
 		}
 		fields := strings.Split(account_str, ",")
 		if len(fields) != 4 {
-			return nil, court_reserver.ParseError
+			return nil, ParseError{}
 		}
 		account := Account{
 			User:        fields[0],
@@ -135,12 +143,13 @@ func NewSessionManager(conn *sql.Conn, captcha_solver court_reserver.CaptchaSolv
 		accounts = append(accounts, account)
 	}
 	return &SessionManager{
-		accounts:      accounts,
-		account_mutex: sync.RWMutex{},
-		sessions:      sync.Map{},
-		conn:          conn,
-		timeZone:      time_zone,
-		captchaSolver: captcha_solver,
+		accounts:       accounts,
+		account_mutex:  sync.RWMutex{},
+		sessions:       sync.Map{},
+		conn:           conn,
+		timeZone:       time_zone,
+		captchaSolver:  captcha_solver,
+		reserverPlugin: court_reserver_plugin,
 	}, nil
 }
 
@@ -294,12 +303,12 @@ type SingleBookCompatible struct {
 	CourtNamePreference []string
 }
 
-func (t SingleBookCompatible) convert() court_reserver.SingleBook {
-	court_name_pref := make([]court_reserver.CourtName, 0, len(t.CourtNamePreference))
+func (t SingleBookCompatible) convert() court_reserver_interface.SingleBook {
+	court_name_pref := make([]string, 0, len(t.CourtNamePreference))
 	for _, v := range t.CourtNamePreference {
-		court_name_pref = append(court_name_pref, court_reserver.CourtName(v))
+		court_name_pref = append(court_name_pref, v)
 	}
-	return court_reserver.SingleBook{
+	return court_reserver_interface.SingleBook{
 		StartTime:           time.Duration(t.StartTimeSec) * time.Second,
 		Duration:            time.Duration(t.DurationSec) * time.Second,
 		CourtNamePreference: court_name_pref,
@@ -308,7 +317,7 @@ func (t SingleBookCompatible) convert() court_reserver.SingleBook {
 
 type ReservationCompatible struct {
 	Date        string
-	Site        court_reserver.Site
+	Site        court_reserver_interface.Site
 	Preferences []SingleBookCompatible
 	Priority    int
 }
@@ -340,7 +349,7 @@ func (t *SessionManager) PlaceReservation(params *PlaceReservationParams) (int64
 	if err != nil || date.Before(today_start) {
 		return -1, TennisApiError{MalformedData, "Invalid date"}
 	}
-	reservation_date := date.Add(-time.Duration(court_reserver.SiteLookahead(params.Reservation.Site)) * 24 * time.Hour)
+	reservation_date := date.Add(-time.Duration(court_reserver_interface.SiteLookahead(params.Reservation.Site)) * 24 * time.Hour)
 	res_y, res_m, res_d := reservation_date.Date()
 	reservation_booking_start := time.Date(res_y, res_m, res_d, 0, 0, 0, 0, t.timeZone).Add(BOOKING_START)
 
@@ -374,13 +383,17 @@ func (t *SessionManager) PlaceReservation(params *PlaceReservationParams) (int64
 		return -1, err
 	}
 
-	// book immediately if in booking time
+	// book immediately if in booking time.
+	// But if no reserver plugin is find, do not reserve.
+	if t.reserverPlugin == nil {
+		return uid, err
+	}
 	if now.After(reservation_booking_start) && now.After(today_booking_start) && now.Before(today_booking_end) {
-		books := make([]court_reserver.SingleBook, 0, len(params.Reservation.Preferences))
+		books := make([]court_reserver_interface.SingleBook, 0, len(params.Reservation.Preferences))
 		for _, v := range params.Reservation.Preferences {
 			books = append(books, v.convert())
 		}
-		reservation := court_reserver.Reservation{
+		reservation := court_reserver_interface.Reservation{
 			Date:        date,
 			Site:        params.Reservation.Site,
 			Preferences: books,
@@ -388,20 +401,20 @@ func (t *SessionManager) PlaceReservation(params *PlaceReservationParams) (int64
 		}
 		go (func() {
 			login_session := xjtuorg.New(true)
-			redir, err := login_session.Login(court_reserver.CourtReserveLoginUrl, account.NetId, account.NetIdPasswd)
+			redir, err := login_session.Login(t.reserverPlugin.LoginURL, account.NetId, account.NetIdPasswd)
 
 			// cannot login, return all failed.
 			// reuse login
 			if err != nil {
-				UpdateReservation(t.conn, uid, court_reserver.ReservationStatus{
-					Code:      court_reserver.Failed,
+				UpdateReservation(t.conn, uid, court_reserver_interface.ReservationStatus{
+					Code:      court_reserver_interface.Failed,
 					Msg:       fmt.Sprintf("Login Error: %s", err.Error()),
 					CourtTime: make(map[string]string),
 				})
 				fmt.Fprintf(os.Stderr, "[ERROR Session LOGIN] %s %s", time.Now().Format(time.RFC3339), err.Error())
 				return
 			}
-			reserver := court_reserver.New(redir)
+			reserver := t.reserverPlugin.NewCourtReserver(redir)
 			status := reserver.BookNow(t.timeZone, &reservation, t.captchaSolver)
 
 			err = UpdateReservation(t.conn, uid, status)
@@ -428,7 +441,7 @@ func (t *SessionManager) CancelReservation(params *CancelReservationParams) erro
 	t.account_mutex.RLock()
 	netid := account.NetId
 	t.account_mutex.RUnlock()
-	res, err := t.conn.ExecContext(context.Background(), fmt.Sprintf("DELETE FROM `reservations` WHERE `netid` = ? AND `uid` = ? AND `status_code` = %d", int(court_reserver.Pending)), netid, params.Uid)
+	res, err := t.conn.ExecContext(context.Background(), fmt.Sprintf("DELETE FROM `reservations` WHERE `netid` = ? AND `uid` = ? AND `status_code` = %d", int(court_reserver_interface.Pending)), netid, params.Uid)
 	if err != nil {
 		return err
 	}
@@ -445,7 +458,7 @@ func (t *SessionManager) CancelReservation(params *CancelReservationParams) erro
 type ReservationResult struct {
 	Uid         int64
 	Reservation ReservationCompatible
-	Status      court_reserver.ReservationStatus
+	Status      court_reserver_interface.ReservationStatus
 }
 type ReservationResponse struct {
 	Count  uint
@@ -480,10 +493,10 @@ func (t *SessionManager) GetReservations(params *GetReservationsParams) (Reserva
 	for rows.Next() {
 		var uid int64
 		var date string
-		var site court_reserver.Site
+		var site court_reserver_interface.Site
 		var preferences string
 		var priority int
-		var status court_reserver.ReservationStatus
+		var status court_reserver_interface.ReservationStatus
 		var court_time_string string
 		err = rows.Scan(&uid, &date, &site, &preferences, &priority, &status.Code, &status.Msg, &court_time_string)
 		if err != nil {

@@ -8,26 +8,29 @@ import (
 	"os"
 	"time"
 
-	"github.com/endaytrer/court_reserver"
+	"github.com/endaytrer/court_reserver_interface"
+	"github.com/endaytrer/court_reserver_interface/captcha_solver"
 	"github.com/endaytrer/xjtuorg"
 )
 
 // handle delayed reservation requests
 type ReservationHandler struct {
 	conn           *sql.Conn
-	time_zone      *time.Location
-	captcha_solver court_reserver.CaptchaSolver
+	timeZone       *time.Location
+	captchaSolver  captcha_solver.CaptchaSolver
+	reserverPlugin *CourtReserverPlugin
 }
 
-func NewReservationHandler(conn *sql.Conn, captcha_solver court_reserver.CaptchaSolver) ReservationHandler {
+func NewReservationHandler(conn *sql.Conn, captcha_solver captcha_solver.CaptchaSolver, reserver_plugin *CourtReserverPlugin) ReservationHandler {
 	time_zone, err := time.LoadLocation("Asia/Shanghai")
 	if err != nil {
 		panic("Invalid time zone")
 	}
 	return ReservationHandler{
 		conn:           conn,
-		time_zone:      time_zone,
-		captcha_solver: captcha_solver,
+		timeZone:       time_zone,
+		captchaSolver:  captcha_solver,
+		reserverPlugin: reserver_plugin,
 	}
 }
 
@@ -38,7 +41,7 @@ const BOOKING_END = 21*time.Hour + 39*time.Minute + 55*time.Second
 
 func (t *ReservationHandler) wakeUp(date string) error {
 	// select reservations ready to be performed.
-	stmt, err := t.conn.PrepareContext(context.Background(), fmt.Sprintf("SELECT `uid`, `netid`, `passwd`, `date`, `site`, `preferences`, `priority` FROM `reservations` WHERE `status_code` = %d AND `reserve_on` = ? ORDER BY `priority` ASC", int(court_reserver.Pending)))
+	stmt, err := t.conn.PrepareContext(context.Background(), fmt.Sprintf("SELECT `uid`, `netid`, `passwd`, `date`, `site`, `preferences`, `priority` FROM `reservations` WHERE `status_code` = %d AND `reserve_on` = ? ORDER BY `priority` ASC", int(court_reserver_interface.Pending)))
 	if err != nil {
 		return err
 	}
@@ -46,7 +49,7 @@ func (t *ReservationHandler) wakeUp(date string) error {
 	if err != nil {
 		return err
 	}
-	reserver_info := make(map[string][]court_reserver.Reservation)
+	reserver_info := make(map[string][]court_reserver_interface.Reservation)
 	reserver_uids := make(map[string][]int64)
 	reserver_passwds := make(map[string]string)
 
@@ -55,7 +58,7 @@ func (t *ReservationHandler) wakeUp(date string) error {
 		var netid string
 		var passwd string
 		var date_str string
-		var site court_reserver.Site
+		var site court_reserver_interface.Site
 		var preferences string
 		var priority int
 
@@ -68,20 +71,20 @@ func (t *ReservationHandler) wakeUp(date string) error {
 		if err != nil {
 			return err
 		}
-		date, err := time.ParseInLocation(DATE_FORMAT, date_str, t.time_zone)
+		date, err := time.ParseInLocation(DATE_FORMAT, date_str, t.timeZone)
 		if err != nil {
 			return err
 		}
-		books_internal := make([]court_reserver.SingleBook, 0, len(books))
+		books_internal := make([]court_reserver_interface.SingleBook, 0, len(books))
 		for _, book := range books {
 			books_internal = append(books_internal, book.convert())
 		}
 		if _, ok := reserver_info[netid]; !ok {
-			reserver_info[netid] = make([]court_reserver.Reservation, 0)
+			reserver_info[netid] = make([]court_reserver_interface.Reservation, 0)
 			reserver_uids[netid] = make([]int64, 0)
 		}
 		reserver_passwds[netid] = passwd
-		reserver_info[netid] = append(reserver_info[netid], court_reserver.Reservation{
+		reserver_info[netid] = append(reserver_info[netid], court_reserver_interface.Reservation{
 			Date:        date,
 			Site:        site,
 			Preferences: books_internal,
@@ -93,14 +96,14 @@ func (t *ReservationHandler) wakeUp(date string) error {
 		fmt.Printf("[Info] Totally %d bookings found for today in account %s\n", len(reserver_info[netid]), netid)
 		go (func() {
 			login_session := xjtuorg.New(true)
-			redir, err := login_session.Login(court_reserver.CourtReserveLoginUrl, netid, reserver_passwds[netid])
+			redir, err := login_session.Login(t.reserverPlugin.LoginURL, netid, reserver_passwds[netid])
 
 			// cannot login, return all failed.
 			// reuse login
 			if err != nil {
 				for _, uid := range reserver_uids[netid] {
-					UpdateReservation(t.conn, uid, court_reserver.ReservationStatus{
-						Code:      court_reserver.Failed,
+					UpdateReservation(t.conn, uid, court_reserver_interface.ReservationStatus{
+						Code:      court_reserver_interface.Failed,
 						Msg:       fmt.Sprintf("Login Error: %s", err.Error()),
 						CourtTime: make(map[string]string),
 					})
@@ -109,17 +112,17 @@ func (t *ReservationHandler) wakeUp(date string) error {
 				return
 			}
 			fmt.Printf("[Info] Login successfully. Start booking for %s...\n", netid)
-			reserver := court_reserver.New(redir)
+			reserver := t.reserverPlugin.NewCourtReserver(redir)
 
-			now := time.Now().In(t.time_zone)
+			now := time.Now().In(t.timeZone)
 			y, m, d := now.Date()
-			booking_start := time.Date(y, m, d, 0, 0, 0, 0, t.time_zone).Add(BOOKING_START)
-			for time.Now().In(t.time_zone).Before(booking_start) {
+			booking_start := time.Date(y, m, d, 0, 0, 0, 0, t.timeZone).Add(BOOKING_START)
+			for time.Now().In(t.timeZone).Before(booking_start) {
 				time.Sleep(1 * time.Second)
 			}
 
 			for i, reservation := range reserver_info[netid] {
-				result_status := reserver.BookNow(t.time_zone, &reservation, t.captcha_solver)
+				result_status := reserver.BookNow(t.timeZone, &reservation, t.captchaSolver)
 				err := UpdateReservation(t.conn, reserver_uids[netid][i], result_status)
 				if err != nil {
 					fmt.Fprintf(os.Stderr, "[ERROR Reserver SQL] %s %s", time.Now().Format(time.RFC3339), err.Error())
@@ -131,7 +134,7 @@ func (t *ReservationHandler) wakeUp(date string) error {
 	}
 	return nil
 }
-func UpdateReservation(conn *sql.Conn, uid int64, status court_reserver.ReservationStatus) error {
+func UpdateReservation(conn *sql.Conn, uid int64, status court_reserver_interface.ReservationStatus) error {
 
 	stmt, err := conn.PrepareContext(context.Background(), "UPDATE `reservations` SET `status_code` = ?, `msg` = ?, `court_time` = ? WHERE uid = ?")
 	if err != nil {
@@ -150,12 +153,12 @@ func UpdateReservation(conn *sql.Conn, uid int64, status court_reserver.Reservat
 
 func (t *ReservationHandler) MainEvent() {
 	for {
-		now := time.Now().In(t.time_zone)
-		target := time.Date(now.Year(), now.Month(), now.Day(), WAKEUP_HR, WAKEUP_MIN, 0, 0, t.time_zone)
+		now := time.Now().In(t.timeZone)
+		target := time.Date(now.Year(), now.Month(), now.Day(), WAKEUP_HR, WAKEUP_MIN, 0, 0, t.timeZone)
 		if now.After(target) {
 			target = target.Add(24 * time.Hour)
 		}
-		for time.Now().In(t.time_zone).Before(target) {
+		for time.Now().In(t.timeZone).Before(target) {
 			time.Sleep(5 * time.Second)
 		}
 		err := t.wakeUp(target.Format(DATE_FORMAT))

@@ -1,9 +1,9 @@
 module github.com/endaytrer/xjtutennis
 
-go 1.23.4
+go 1.23.7
 
 require (
-	github.com/endaytrer/court_reserver v1.0.2-alpha.2
+	github.com/endaytrer/court_reserver_interface v0.0.0-20250314082801-1f8b4d6dc2af
 	github.com/endaytrer/xjtuorg v1.0.0
 	github.com/gin-gonic/gin v1.10.0
 	github.com/go-viper/mapstructure/v2 v2.2.1
