@@ -44,17 +44,14 @@ function Login() {
                 
                 <img src={logo} alt="XJTUTennis" className="h-full dark:hidden" />
                 <img src={darkLogo} alt="XJTUTennis" className="h-full hidden dark:inline" />
-
                 {
                     version?.MainVersion === "unknown"
                         ? <div className="text-sm text-red-500">- Development Server</div>
-                        : (
-                            version?.MainVersion.includes("alpha")
-                                ? <div className="text-sm text-gray-500">- Alpha Release</div>
-                                : <></>
-                        )
+                        : (version?.MainVersion.includes("alpha") && <div className="text-sm text-gray-500">- Alpha Release</div>)
                 }
+                
             </h1>
+            {version?.ReserverVersion === null && <div className="text-gray-400 dark:text-gray-400 text-md uppercase tracking-widest -mt-8">Community</div>}
             <br />
             <div className="flex flex-col my-5">
             <label htmlFor="username" className="uppercase text-sm tracking-wider">Username</label>
