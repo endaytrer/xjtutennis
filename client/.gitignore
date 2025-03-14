@@ -7,7 +7,9 @@ yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 
+.react-router
 node_modules
+build
 dist
 dist-ssr
 *.local

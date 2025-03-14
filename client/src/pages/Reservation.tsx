@@ -1,10 +1,11 @@
 import { useEffect, useState } from "react";
-import sites from "./sites";
+import sites from "../sites";
 
-import { IdClosure, Preference, Reservation as ReserveRequest } from "./api";
-import { request, RequestErr } from "./request";
-import { formatTime, parseTime, formatDuration } from "./utils";
-import { dialog } from "./Dialog";
+import { IdClosure, Preference, Reservation as ReserveRequest } from "../api";
+import { request, RequestErr } from "../request";
+import { formatTime, parseTime, formatDuration } from "../utils";
+import { dialog } from "../components/Dialog";
+import App from "../components/App";
 async function placeReservation(e: React.FormEvent, resRequest: ReserveRequest, setErrorMsg: (msg: string) => void) {
     e.preventDefault();
     try {
@@ -292,4 +293,6 @@ function Reservation() {
     </div>)
 }
 
-export default Reservation;
+export default function ReservationPage() {
+    return <App><Reservation /></App>
+};

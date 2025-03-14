@@ -1,11 +1,13 @@
 import { useEffect, useState } from "react";
-import { request, RequestErr } from "./request";
-import { Preference, ReservationResponse, ReservationStatus } from "./api";
-import { formatTime } from "./utils";
+import { request, RequestErr } from "../request";
+import { Preference, ReservationResponse, ReservationStatus } from "../api";
+import { formatTime } from "../utils";
 import { Link } from "react-router";
-import trashcan from "./assets/trashcan.svg";
-import { NextPage, PrevPage, RightArrow } from "./icons";
-import { dialog } from "./Dialog";
+import { NextPage, PrevPage, RightArrow } from "../components/icons";
+import { dialog } from "../components/Dialog";
+import App from "../components/App";
+
+import trashcan from "../assets/trashcan.svg";
 
 function StatusTag(props: { status: number }) {
   if (props.status === 0) {
@@ -212,7 +214,7 @@ function ReservationDetail(props: {
         <td className="p-3 align-top select-none">
           <div className="w-full h-full flex items-center justify-start">
             <Link
-              to={`/dashboard/reserve?reservation=${encodeURI(
+              to={`/reserve?reservation=${encodeURI(
                 JSON.stringify(props.status.Reservation)
               )}`}
               className="h-7 px-3 inline-flex items-center justify-center rounded-full shadow-md bg-blue-200 dark:bg-blue-700"
@@ -414,4 +416,18 @@ function Dashboard(props: { user: string }) {
     </div>
   );
 }
-export default Dashboard;
+
+export default function DashboardPage() {
+    const [user, setUser] = useState("ERROR not set");
+    const [_, setNetId] = useState("ERROR not set");
+    useEffect(() => {
+      request("/login", "GET")
+        .catch(() => (window.location.href = "/"))
+        .then((resp) => {
+          const { User, NetId } = resp;
+          setUser(User);
+          setNetId(NetId);
+        });
+    }, []);
+  return <App><Dashboard user={user}></Dashboard></App>
+}
