@@ -7,9 +7,12 @@
 > 
 > ### Notice
 >
-> To guarantee the efficiency of platform, the core court reserver part `court_reserver` is **NOT** open sourced.
+> To guarantee the efficiency of platform, the core court reserver part `court_reserver` is **NOT** open sourced,
+> and is an additional plugin of the platform.
+> You can still run the program without the plugin, but no courts will be reserved, only showed on UI.
 >
-> However, you can write your own reserver as long as it meets the API requirements.
+> You can write your own reserver as long as it meets the API requirements as in
+> https://github.com/endaytrer/court_reserver_interface.
 
 
 ## Quickstart (Temporary)
@@ -20,8 +23,10 @@
 #     username,password,NetId,NetId Password
 # Example:
 #     foo,my_password,3124100000,netid_password
-# Start server:
-go run . http://202.117.17.144:8071/
+# Start server without reserver plugin:
+go run .
+# Or, start a server with reserver plugin:
+go run . -reserver-plugin /path/to/court_reserver.so -challenge-url http://202.117.17.144:8071/
 
 # On another terminal,
 # Start frontend development server
