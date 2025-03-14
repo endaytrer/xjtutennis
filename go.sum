@@ -9,8 +9,8 @@ github.com/cloudwego/iasm v0.2.0/go.mod h1:8rXZaNYT2n95jn+zTI1sDr+IgcD2GVs0nlbbQ
 github.com/davecgh/go-spew v1.1.0/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/davecgh/go-spew v1.1.1 h1:vj9j/u1bqnvCEfJOwUhtlOARqs3+rkHYY13jYWTU97c=
 github.com/davecgh/go-spew v1.1.1/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
-github.com/endaytrer/court_reserver v1.0.1 h1:sD9zYklf1PJST+NeKYKNuO9yhPmwk/tX9uzeEie7k/c=
-github.com/endaytrer/court_reserver v1.0.1/go.mod h1:TyvVsG3Fg6rTMZi2ySLS/eXdol0g5qDhmyzC7FanzdI=
+github.com/endaytrer/court_reserver v1.0.2-alpha.2 h1:bLdZM5iR4hKlFIzVVzMhMn/q/r24m8FNCLbWbBQ8LoI=
+github.com/endaytrer/court_reserver v1.0.2-alpha.2/go.mod h1:TyvVsG3Fg6rTMZi2ySLS/eXdol0g5qDhmyzC7FanzdI=
 github.com/endaytrer/xjtuorg v1.0.0 h1:LJTT2qFORjQ2VT0t6TyADmR1c70H7t0n34V3mtH8kkM=
 github.com/endaytrer/xjtuorg v1.0.0/go.mod h1:MXFp1M1ZGjkfJfo4jaSeIONcYmTWy2yvyi8MLvq4icY=
 github.com/gabriel-vasile/mimetype v1.4.8 h1:FfZ3gj38NjllZIeJAmMhr+qKL8Wu+nOoI3GqacKw1NM=

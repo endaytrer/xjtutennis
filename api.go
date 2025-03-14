@@ -286,20 +286,6 @@ func (t *SessionManager) SignOut(params *SessionOnlyParams) {
 	t.sessions.Delete(params.Session)
 }
 
-type SingleBook struct {
-	// book all contiguous courts COVERINGs Date + StartTime to Date + StartTime + Duration. Time starts with UTC.
-	StartTime time.Duration
-	Duration  time.Duration
-	// preferring booking name
-	CourtNamePreference []court_reserver.CourtName
-}
-type Reservation struct {
-	Date time.Time
-	Site court_reserver.Site
-	// book ONLY the top book available
-	Preferences []SingleBook
-	Priority    int // lower priority value would try to book first.
-}
 type SingleBookCompatible struct {
 	// book all contiguous courts COVERINGs Date + StartTime to Date + StartTime + Duration. Time starts with UTC.
 	StartTimeSec int
@@ -308,12 +294,12 @@ type SingleBookCompatible struct {
 	CourtNamePreference []string
 }
 
-func (t SingleBookCompatible) convert() SingleBook {
+func (t SingleBookCompatible) convert() court_reserver.SingleBook {
 	court_name_pref := make([]court_reserver.CourtName, 0, len(t.CourtNamePreference))
 	for _, v := range t.CourtNamePreference {
 		court_name_pref = append(court_name_pref, court_reserver.CourtName(v))
 	}
-	return SingleBook{
+	return court_reserver.SingleBook{
 		StartTime:           time.Duration(t.StartTimeSec) * time.Second,
 		Duration:            time.Duration(t.DurationSec) * time.Second,
 		CourtNamePreference: court_name_pref,
@@ -326,14 +312,6 @@ type ReservationCompatible struct {
 	Preferences []SingleBookCompatible
 	Priority    int
 }
-
-type ReservationStatusCode int
-
-const (
-	Pending ReservationStatusCode = iota
-	Success
-	Failed
-)
 
 type PlaceReservationParams struct {
 	Session     SessionId
@@ -364,9 +342,9 @@ func (t *SessionManager) PlaceReservation(params *PlaceReservationParams) (int64
 	}
 	reservation_date := date.Add(-time.Duration(court_reserver.SiteLookahead(params.Reservation.Site)) * 24 * time.Hour)
 	res_y, res_m, res_d := reservation_date.Date()
-	reservation_booking_start := time.Date(res_y, res_m, res_d, WAKEUP_HR, WAKEUP_MIN, 0, 0, t.timeZone)
+	reservation_booking_start := time.Date(res_y, res_m, res_d, 0, 0, 0, 0, t.timeZone).Add(BOOKING_START)
 
-	today_booking_start := time.Date(today_y, today_m, today_d, WAKEUP_HR, WAKEUP_MIN, 0, 0, t.timeZone)
+	today_booking_start := time.Date(today_y, today_m, today_d, 0, 0, 0, 0, t.timeZone).Add(BOOKING_START)
 	today_booking_end := time.Date(today_y, today_m, today_d, 0, 0, 0, 0, t.timeZone).Add(BOOKING_END)
 
 	// book immediately if in booking time
@@ -398,11 +376,11 @@ func (t *SessionManager) PlaceReservation(params *PlaceReservationParams) (int64
 
 	// book immediately if in booking time
 	if now.After(reservation_booking_start) && now.After(today_booking_start) && now.Before(today_booking_end) {
-		books := make([]SingleBook, 0, len(params.Reservation.Preferences))
+		books := make([]court_reserver.SingleBook, 0, len(params.Reservation.Preferences))
 		for _, v := range params.Reservation.Preferences {
 			books = append(books, v.convert())
 		}
-		reservation := Reservation{
+		reservation := court_reserver.Reservation{
 			Date:        date,
 			Site:        params.Reservation.Site,
 			Preferences: books,
@@ -415,8 +393,8 @@ func (t *SessionManager) PlaceReservation(params *PlaceReservationParams) (int64
 			// cannot login, return all failed.
 			// reuse login
 			if err != nil {
-				UpdateReservation(t.conn, uid, ReservationStatus{
-					Code:      Failed,
+				UpdateReservation(t.conn, uid, court_reserver.ReservationStatus{
+					Code:      court_reserver.Failed,
 					Msg:       fmt.Sprintf("Login Error: %s", err.Error()),
 					CourtTime: make(map[string]string),
 				})
@@ -424,7 +402,7 @@ func (t *SessionManager) PlaceReservation(params *PlaceReservationParams) (int64
 				return
 			}
 			reserver := court_reserver.New(redir)
-			status := BookNow(t.timeZone, reserver, &reservation, t.captchaSolver)
+			status := reserver.BookNow(t.timeZone, &reservation, t.captchaSolver)
 
 			err = UpdateReservation(t.conn, uid, status)
 			if err != nil {
@@ -450,7 +428,7 @@ func (t *SessionManager) CancelReservation(params *CancelReservationParams) erro
 	t.account_mutex.RLock()
 	netid := account.NetId
 	t.account_mutex.RUnlock()
-	res, err := t.conn.ExecContext(context.Background(), fmt.Sprintf("DELETE FROM `reservations` WHERE `netid` = ? AND `uid` = ? AND `status_code` = %d", int(Pending)), netid, params.Uid)
+	res, err := t.conn.ExecContext(context.Background(), fmt.Sprintf("DELETE FROM `reservations` WHERE `netid` = ? AND `uid` = ? AND `status_code` = %d", int(court_reserver.Pending)), netid, params.Uid)
 	if err != nil {
 		return err
 	}
@@ -464,15 +442,10 @@ func (t *SessionManager) CancelReservation(params *CancelReservationParams) erro
 	return nil
 }
 
-type ReservationStatus struct {
-	Code      ReservationStatusCode
-	Msg       string
-	CourtTime map[string]string // time -> court
-}
 type ReservationResult struct {
 	Uid         int64
 	Reservation ReservationCompatible
-	Status      ReservationStatus
+	Status      court_reserver.ReservationStatus
 }
 type ReservationResponse struct {
 	Count  uint
@@ -510,7 +483,7 @@ func (t *SessionManager) GetReservations(params *GetReservationsParams) (Reserva
 		var site court_reserver.Site
 		var preferences string
 		var priority int
-		var status ReservationStatus
+		var status court_reserver.ReservationStatus
 		var court_time_string string
 		err = rows.Scan(&uid, &date, &site, &preferences, &priority, &status.Code, &status.Msg, &court_time_string)
 		if err != nil {
