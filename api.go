@@ -16,6 +16,7 @@ import (
 	"github.com/endaytrer/court_reserver_interface"
 	"github.com/endaytrer/court_reserver_interface/captcha_solver"
 	"github.com/endaytrer/xjtuorg"
+	"github.com/endaytrer/xjtutennis/constant"
 )
 
 type TennisApiErrorType int
@@ -187,6 +188,21 @@ func CheckPasswd(passwd string) (ok bool) {
 type LoginParams struct {
 	User   string
 	Passwd string
+}
+type VersionResponse struct {
+	MainVersion     string
+	ReserverVersion *string
+}
+
+func (t *SessionManager) Version() (VersionResponse, error) {
+	var reserver_version *string = nil
+	if t.reserverPlugin != nil {
+		reserver_version = &t.reserverPlugin.Version
+	}
+	return VersionResponse{
+		MainVersion:     constant.Version,
+		ReserverVersion: reserver_version,
+	}, nil
 }
 
 func (t *SessionManager) Login(params *LoginParams) (SessionId, error) {

@@ -11,6 +11,7 @@ type CourtReserverPlugin struct {
 	NewCourtReserver func(redir string) court_reserver_interface.CourtReserver
 	NewCaptchaSolver func(challenge_url string) captcha_solver.CaptchaSolver
 	LoginURL         string
+	Version          string
 }
 
 func loadCourtReserver(path string) (*CourtReserverPlugin, error) {
@@ -28,7 +29,11 @@ func loadCourtReserver(path string) (*CourtReserverPlugin, error) {
 		return nil, err
 	}
 	login_url, err := plug.Lookup("CourtReserveLoginUrl")
+	if err != nil {
+		return nil, err
+	}
 
+	version, err := plug.Lookup("Version")
 	if err != nil {
 		return nil, err
 	}
@@ -37,5 +42,6 @@ func loadCourtReserver(path string) (*CourtReserverPlugin, error) {
 		NewCourtReserver: new_court_reserver.(func(redir string) court_reserver_interface.CourtReserver),
 		NewCaptchaSolver: new_captcha_solver.(func(challenge_url string) captcha_solver.CaptchaSolver),
 		LoginURL:         *login_url.(*string),
+		Version:          *version.(*string),
 	}, nil
 }
