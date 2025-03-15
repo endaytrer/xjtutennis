@@ -20,7 +20,7 @@ fi
 
 VERSION=$1
 # Check if version matches regex
-if [[ $BRANCH -eq "alpha" ]]; then
+if [[ $BRANCH == "alpha" ]]; then
     if [[ ! $VERSION =~ ^v([0-9]|[1-9][0-9]+)\.([0-9]|[1-9][0-9]+)\.([0-9]|[1-9][0-9]+)\-alpha\.[1-9][0-9]*$ ]]; then
         echo "Fatal: version format does not match alpha release"
         exit 3
