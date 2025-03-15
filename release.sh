@@ -32,13 +32,38 @@ else
     fi
 fi
 
-VAR_VERSION="github.com/endaytrer/xjtutennis/constant.Version"
-BUILD_COMMAND="go build -ldflags \"-X ${VAR_VERSION}=${VERSION}\" -o xjtutennis"
+export VERSION
+build_targets=(
+    "linux amd64"
+    "linux arm64"
+    "linux mips64"
+    "linux mips64le"
+    "linux riscv64"
+    "linux ppc64"
+    "linux ppc64le"
+    "linux s390x"
+    "freebsd amd64"
+    "freebsd arm64"
+    "darwin arm64"
+    "darwin amd64"
+    "windows amd64"
+    "windows arm64"
+)
+for build_target in "${build_targets[@]}"; do
 
-if ! eval $BUILD_COMMAND; then
-    echo "Fatal: build failed"
-    exit 4
-fi
+    arr=($build_target)
+    export OS=${arr[0]}
+    export ARCH=${arr[1]}
+    
+    if ! ./build.sh; then
+        echo "Fatal: build target $OS-$ARCH failed"
+        exit 4
+    fi
+done
+
+rm -rf dist
+mkdir dist
+mv *.tar.gz dist
 
 if ! $(git tag $VERSION); then
     exit 5

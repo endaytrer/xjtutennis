@@ -1,5 +1,8 @@
 .env
-www
+dist
 user_data.csv
 xjtutennis.db
 xjtutennis
+build
+dist
+*.tar.gz
