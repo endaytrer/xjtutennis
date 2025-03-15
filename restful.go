@@ -197,9 +197,6 @@ func restGetReservations(s *SessionManager, c *gin.Context) {
 func ServeHTTP(s *SessionManager, port int) {
 	r := gin.Default()
 
-	r.POST("/checkYzm", func(c *gin.Context) {
-		c.Data(200, "text/plain", []byte("true"))
-	})
 	r.GET("/api/version", func(c *gin.Context) { restVersion(s, c) })
 	r.GET("/api/login", func(c *gin.Context) { restGetLoginAccount(s, c) })
 	r.POST("/api/login", func(c *gin.Context) { restLogin(s, c) })
