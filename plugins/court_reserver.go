@@ -1,4 +1,4 @@
-package main
+package plugins
 
 import (
 	"plugin"
@@ -15,7 +15,7 @@ type CourtReserverPlugin struct {
 	Version          string
 }
 
-func loadCourtReserver(path string) (*CourtReserverPlugin, error) {
+func LoadCourtReserver(path string) (*CourtReserverPlugin, error) {
 	plug, err := plugin.Open(path)
 	if err != nil {
 		return nil, err

@@ -1,4 +1,4 @@
-package main
+package apis
 
 import (
 	"context"
@@ -17,6 +17,7 @@ import (
 	"github.com/endaytrer/court_reserver_interface/captcha_solver"
 	"github.com/endaytrer/xjtuorg"
 	"github.com/endaytrer/xjtutennis/constant"
+	"github.com/endaytrer/xjtutennis/plugins"
 )
 
 type TennisApiErrorType int
@@ -83,10 +84,11 @@ func (t TennisApiError) ToHttpStatus() int {
 }
 
 type Account struct {
-	User        string
-	Passwd      string
-	NetId       string
-	NetIdPasswd string
+	User          string
+	Passwd        string
+	NetId         string
+	NetIdPasswd   string
+	PaymentPasswd string
 }
 
 type SessionId string
@@ -103,7 +105,7 @@ type SessionManager struct {
 	conn           *sql.Conn
 	timeZone       *time.Location
 	captchaSolver  captcha_solver.CaptchaSolver
-	reserverPlugin *CourtReserverPlugin
+	reserverPlugin *plugins.CourtReserverPlugin
 }
 
 const user_data_file = "user_data.csv"
@@ -115,7 +117,7 @@ func (t ParseError) Error() string {
 	return "Error: ParseError"
 }
 
-func NewSessionManager(conn *sql.Conn, captcha_solver captcha_solver.CaptchaSolver, court_reserver_plugin *CourtReserverPlugin) (*SessionManager, error) {
+func NewSessionManager(conn *sql.Conn, captcha_solver captcha_solver.CaptchaSolver, court_reserver_plugin *plugins.CourtReserverPlugin) (*SessionManager, error) {
 	time_zone, err := time.LoadLocation("Asia/Shanghai")
 	if err != nil {
 		panic("Invalid time zone")
@@ -132,14 +134,15 @@ func NewSessionManager(conn *sql.Conn, captcha_solver captcha_solver.CaptchaSolv
 			continue // skip empty lines
 		}
 		fields := strings.Split(account_str, ",")
-		if len(fields) != 4 {
+		if len(fields) != 5 {
 			return nil, ParseError{}
 		}
 		account := Account{
-			User:        fields[0],
-			Passwd:      fields[1],
-			NetId:       fields[2],
-			NetIdPasswd: fields[3],
+			User:          fields[0],
+			Passwd:        fields[1],
+			NetId:         fields[2],
+			NetIdPasswd:   fields[3],
+			PaymentPasswd: fields[4],
 		}
 		accounts = append(accounts, account)
 	}
@@ -159,7 +162,7 @@ func (t *SessionManager) WriteAccounts() error {
 	t.account_mutex.RLock()
 	var ans = ""
 	for _, account := range t.accounts {
-		temp := fmt.Sprintf("%s,%s,%s,%s\n", account.User, account.Passwd, account.NetId, account.NetIdPasswd)
+		temp := fmt.Sprintf("%s,%s,%s,%s,%s\n", account.User, account.Passwd, account.NetId, account.NetIdPasswd, account.PaymentPasswd)
 		ans += temp
 	}
 	t.account_mutex.RUnlock()
@@ -311,30 +314,10 @@ func (t *SessionManager) SignOut(params *SessionOnlyParams) {
 	t.sessions.Delete(params.Session)
 }
 
-type SingleBookCompatible struct {
-	// book all contiguous courts COVERINGs Date + StartTime to Date + StartTime + Duration. Time starts with UTC.
-	StartTimeSec int
-	DurationSec  int
-	// preferring booking name
-	CourtNamePreference []string
-}
-
-func (t SingleBookCompatible) convert() court_reserver_interface.SingleBook {
-	court_name_pref := make([]string, 0, len(t.CourtNamePreference))
-	for _, v := range t.CourtNamePreference {
-		court_name_pref = append(court_name_pref, v)
-	}
-	return court_reserver_interface.SingleBook{
-		StartTime:           time.Duration(t.StartTimeSec) * time.Second,
-		Duration:            time.Duration(t.DurationSec) * time.Second,
-		CourtNamePreference: court_name_pref,
-	}
-}
-
 type ReservationCompatible struct {
 	Date        string
 	Site        court_reserver_interface.Site
-	Preferences []SingleBookCompatible
+	Preferences []constant.SingleBookCompatible
 	Priority    int
 }
 
@@ -342,8 +325,6 @@ type PlaceReservationParams struct {
 	Session     SessionId
 	Reservation ReservationCompatible
 }
-
-const DATE_FORMAT = "2006-01-02"
 
 func (t *SessionManager) PlaceReservation(params *PlaceReservationParams) (int64, error) {
 	account, err := t.getSession(params.Session)
@@ -358,7 +339,7 @@ func (t *SessionManager) PlaceReservation(params *PlaceReservationParams) (int64
 	if err != nil {
 		return -1, err
 	}
-	date, err := time.ParseInLocation(DATE_FORMAT, params.Reservation.Date, t.timeZone)
+	date, err := time.ParseInLocation(constant.DATE_FORMAT, params.Reservation.Date, t.timeZone)
 	now := time.Now().In(t.timeZone)
 	today_y, today_m, today_d := now.Date()
 	today_start := time.Date(today_y, today_m, today_d, 0, 0, 0, 0, t.timeZone)
@@ -371,21 +352,21 @@ func (t *SessionManager) PlaceReservation(params *PlaceReservationParams) (int64
 		reservation_date = date.Add(-time.Duration(t.reserverPlugin.SiteLookahead(params.Reservation.Site)) * 24 * time.Hour)
 	}
 	res_y, res_m, res_d := reservation_date.Date()
-	reservation_booking_start := time.Date(res_y, res_m, res_d, 0, 0, 0, 0, t.timeZone).Add(BOOKING_START)
+	reservation_booking_start := time.Date(res_y, res_m, res_d, 0, 0, 0, 0, t.timeZone).Add(plugins.BOOKING_START)
 
-	today_booking_start := time.Date(today_y, today_m, today_d, 0, 0, 0, 0, t.timeZone).Add(BOOKING_START)
-	today_booking_end := time.Date(today_y, today_m, today_d, 0, 0, 0, 0, t.timeZone).Add(BOOKING_END)
+	today_booking_start := time.Date(today_y, today_m, today_d, 0, 0, 0, 0, t.timeZone).Add(plugins.BOOKING_START)
+	today_booking_end := time.Date(today_y, today_m, today_d, 0, 0, 0, 0, t.timeZone).Add(plugins.BOOKING_END)
 
 	// book immediately if in booking time
-	var reserve_on string = reservation_date.Format(DATE_FORMAT)
+	var reserve_on string = reservation_date.Format(constant.DATE_FORMAT)
 
 	if now.After(reservation_booking_start) {
 		// if now is available for booking, book now
 		if now.Before(today_booking_end) {
-			reserve_on = today_booking_start.Format(DATE_FORMAT)
+			reserve_on = today_booking_start.Format(constant.DATE_FORMAT)
 		} else {
 			// else book tomorrow.
-			reserve_on = today_booking_start.Add(time.Duration(24) * time.Hour).Format(DATE_FORMAT)
+			reserve_on = today_booking_start.Add(time.Duration(24) * time.Hour).Format(constant.DATE_FORMAT)
 		}
 	}
 
@@ -411,7 +392,7 @@ func (t *SessionManager) PlaceReservation(params *PlaceReservationParams) (int64
 	if now.After(reservation_booking_start) && now.After(today_booking_start) && now.Before(today_booking_end) {
 		books := make([]court_reserver_interface.SingleBook, 0, len(params.Reservation.Preferences))
 		for _, v := range params.Reservation.Preferences {
-			books = append(books, v.convert())
+			books = append(books, v.Convert())
 		}
 		reservation := court_reserver_interface.Reservation{
 			Date:        date,
@@ -425,7 +406,7 @@ func (t *SessionManager) PlaceReservation(params *PlaceReservationParams) (int64
 			// cannot login, return all failed.
 			// reuse login
 			if err != nil {
-				UpdateReservation(t.conn, uid, court_reserver_interface.ReservationStatus{
+				plugins.UpdateReservation(t.conn, uid, court_reserver_interface.ReservationStatus{
 					Code:      court_reserver_interface.Failed,
 					Msg:       fmt.Sprintf("Login Error: %s", err.Error()),
 					CourtTime: make(map[string]string),
@@ -436,7 +417,7 @@ func (t *SessionManager) PlaceReservation(params *PlaceReservationParams) (int64
 			reserver := t.reserverPlugin.NewCourtReserver(redir)
 			status := reserver.BookNow(t.timeZone, &reservation, t.captchaSolver)
 
-			err = UpdateReservation(t.conn, uid, status)
+			err = plugins.UpdateReservation(t.conn, uid, status)
 			if err != nil {
 				fmt.Fprintf(os.Stderr, "[ERROR Session SQL] %s %s", time.Now().Format(time.RFC3339), err.Error())
 			}
@@ -528,7 +509,7 @@ func (t *SessionManager) GetReservations(params *GetReservationsParams) (Reserva
 			return ReservationResponse{Count: 0, Result: nil}, err
 		}
 
-		var books []SingleBookCompatible
+		var books []constant.SingleBookCompatible
 		err := json.Unmarshal([]byte(preferences), &books)
 		if err != nil {
 			return ReservationResponse{Count: 0, Result: nil}, err

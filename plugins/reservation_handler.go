@@ -1,4 +1,4 @@
-package main
+package plugins
 
 import (
 	"context"
@@ -11,6 +11,7 @@ import (
 	"github.com/endaytrer/court_reserver_interface"
 	"github.com/endaytrer/court_reserver_interface/captcha_solver"
 	"github.com/endaytrer/xjtuorg"
+	"github.com/endaytrer/xjtutennis/constant"
 )
 
 // handle delayed reservation requests
@@ -66,18 +67,18 @@ func (t *ReservationHandler) wakeUp(date string) error {
 		if err != nil {
 			return err
 		}
-		var books []SingleBookCompatible
+		var books []constant.SingleBookCompatible
 		err := json.Unmarshal([]byte(preferences), &books)
 		if err != nil {
 			return err
 		}
-		date, err := time.ParseInLocation(DATE_FORMAT, date_str, t.timeZone)
+		date, err := time.ParseInLocation(constant.DATE_FORMAT, date_str, t.timeZone)
 		if err != nil {
 			return err
 		}
 		books_internal := make([]court_reserver_interface.SingleBook, 0, len(books))
 		for _, book := range books {
-			books_internal = append(books_internal, book.convert())
+			books_internal = append(books_internal, book.Convert())
 		}
 		if _, ok := reserver_info[netid]; !ok {
 			reserver_info[netid] = make([]court_reserver_interface.Reservation, 0)
@@ -160,7 +161,7 @@ func (t *ReservationHandler) MainEvent() {
 		for time.Now().In(t.timeZone).Before(target) {
 			time.Sleep(5 * time.Second)
 		}
-		err := t.wakeUp(target.Format(DATE_FORMAT))
+		err := t.wakeUp(target.Format(constant.DATE_FORMAT))
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "[ERROR Reserver] %s\t%s\n", time.Now().Format(time.RFC3339), err.Error())
 		}

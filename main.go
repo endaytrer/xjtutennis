@@ -9,6 +9,8 @@ import (
 	"time"
 
 	"github.com/endaytrer/court_reserver_interface/captcha_solver"
+	"github.com/endaytrer/xjtutennis/apis"
+	"github.com/endaytrer/xjtutennis/plugins"
 	_ "github.com/mattn/go-sqlite3"
 )
 
@@ -34,10 +36,10 @@ func main() {
 		flag.Usage()
 		os.Exit(1)
 	}
-	var court_reserver *CourtReserverPlugin
+	var court_reserver *plugins.CourtReserverPlugin
 	var err error
 	if reserver_plugin_path != "" {
-		court_reserver, err = loadCourtReserver(reserver_plugin_path)
+		court_reserver, err = plugins.LoadCourtReserver(reserver_plugin_path)
 		if err != nil {
 			panic(fmt.Sprintf("Cannot load reserver plugin: %s", err.Error()))
 		}
@@ -57,7 +59,7 @@ func main() {
 		solver = court_reserver.NewCaptchaSolver(challenge_url)
 	}
 
-	session_mgr, err := NewSessionManager(conn_session, solver, court_reserver)
+	session_mgr, err := apis.NewSessionManager(conn_session, solver, court_reserver)
 	if err != nil {
 		panic("session manager creation failed")
 	}
@@ -67,11 +69,11 @@ func main() {
 		if err != nil {
 			panic("db connection failed")
 		}
-		reserver := NewReservationHandler(conn_reserver, solver, court_reserver)
+		reserver := plugins.NewReservationHandler(conn_reserver, solver, court_reserver)
 		go reserver.MainEvent()
 	} else {
 		fmt.Printf("[Info] %s The program is running without a reserver. You can still place reservations, but none of them will be served.\n", time.Now().Format(time.RFC3339))
 	}
 
-	ServeHTTP(session_mgr, http_port)
+	apis.ServeHTTP(session_mgr, http_port)
 }
