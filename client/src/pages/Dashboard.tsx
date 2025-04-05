@@ -4,7 +4,7 @@ import { Preference, ReservationResponse, ReservationStatus } from "../api";
 import { formatTime } from "../utils";
 import { Link } from "react-router";
 import { NextPage, PrevPage, RightArrow } from "../components/icons";
-import { dialog } from "../components/Dialog";
+import { authorize, dialog } from "../components/Dialog";
 import App from "../components/App";
 
 import trashcan from "../assets/trashcan.svg";
@@ -26,6 +26,12 @@ function StatusTag(props: { status: number }) {
     return (
       <span className="uppercase text-xs font-bold p-0.5 rounded-md border-2 bg-orange-100 dark:bg-orange-900 border-orange-300 dark:border-orange-600 text-orange-500 dark:text-orange-400">
         Need Payment
+      </span>
+    );
+  } else if (props.status === 4) {
+    return (
+      <span className="uppercase text-xs font-bold p-0.5 rounded-md border-2 bg-purple-100 dark:bg-purple-900 border-purple-300 dark:border-purple-600 text-purple-500 dark:text-purple-400">
+        Need Authorization
       </span>
     );
   }
@@ -171,8 +177,9 @@ function ReservationDetail(props: {
   setResList: (
     callback: (old: ReservationStatus[]) => ReservationStatus[]
   ) => void;
+  update: () => void;
 }) {
-  const expandable = props.status.Status.Code !== 0;
+  const expandable = props.status.Status.Code !== 0 && props.status.Status.Code !== 4;
   const successful = props.status.Status.Code === 1;
   const [expanded, setExpanded] = useState(false);
   return (
@@ -218,7 +225,7 @@ function ReservationDetail(props: {
           <StatusTag status={props.status.Status.Code} />
         </td>
         <td className="p-3 align-top select-none">
-          <div className="w-full h-full flex items-center justify-start">
+          <div className="w-full h-full flex items-center justify-between">
             <Link
               to={`/reserve?reservation=${encodeURI(
                 JSON.stringify(props.status.Reservation)
@@ -227,8 +234,33 @@ function ReservationDetail(props: {
             >
               Rebook
             </Link>
-            {props.status.Status.Code == 0 && (
-              <button
+            {props.status.Status.Code == 4 && <button
+              className="h-7 px-3 ml-2 inline-flex items-center justify-center rounded-full shadow-md bg-purple-200 dark:bg-purple-700"
+              onClick={async (e) => {
+                e.preventDefault()
+                const passwd = await authorize()
+                if (passwd === undefined) {
+                  return;
+                }
+                
+                try {
+                  await request("/authorization", "POST", {}, {
+                      Uid: props.status.Uid,
+                      Passwd: passwd
+                  }) 
+                  await dialog("Info", "Info", "Authorized successfully.");
+                  props.update()
+                } catch (e) {
+                  if (e instanceof RequestErr) {
+                      await dialog("Info", "Error", e.message)
+                  } else {
+                      await dialog("Info", "Error", String(e))
+                  }
+                }
+              }}>
+              Authorize
+            </button>}
+            <button
                 className="h-7 w-7 p-2 ml-2 inline-flex bg-red-600 rounded-full"
                 onClick={async (e) => {
                   e.preventDefault();
@@ -247,9 +279,8 @@ function ReservationDetail(props: {
                   }
                 }}
               >
-                <img src={trashcan} alt="Delete" className="" />
-              </button>
-            )}
+              <img src={trashcan} alt="Delete" className="" />
+            </button>
           </div>
         </td>
       </tr>
@@ -282,7 +313,7 @@ function ReservationDetail(props: {
   );
 }
 async function cancelReservation(
-  Uid: number,
+  Uid: string,
   setErrorMsg: (msg: string) => void,
   setResList: (
     callback: (old: ReservationStatus[]) => ReservationStatus[]
@@ -308,6 +339,7 @@ function Dashboard(props: { user: string }) {
   const [page, setPage] = useState(0);
   const [resList, setResList] = useState<ReservationStatus[]>([]);
   const [errorMsg, setErrorMsg] = useState<string>();
+  const [updateHook, setUpdateHook] = useState(false);
   useEffect(() => {
     request("/reservations", "GET", {
       Page: `${page}`,
@@ -324,7 +356,7 @@ function Dashboard(props: { user: string }) {
         setResList(resp.Result);
         setResCount(resp.Count);
       });
-  }, [rowsPerPage, page]);
+  }, [rowsPerPage, page, updateHook]);
   return (
     <div className="w-full">
       <h1 className="text-slate-900 dark:text-white text-2xl my-5">
@@ -365,6 +397,7 @@ function Dashboard(props: { user: string }) {
                 status={v}
                 setErrorMsg={setErrorMsg}
                 setResList={setResList}
+                update={() => setUpdateHook((t) => !t)}
               />
             ))}
           </tbody>

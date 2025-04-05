@@ -1,4 +1,4 @@
-package apis
+package api
 
 import (
 	"encoding/json"
@@ -6,6 +6,7 @@ import (
 	"io"
 	"net/http"
 
+	"github.com/endaytrer/xjtutennis/constant"
 	"github.com/gin-gonic/gin"
 	"github.com/go-viper/mapstructure/v2"
 )
@@ -31,25 +32,25 @@ func makeResponse(s *SessionManager, c *gin.Context, callback func(s *SessionMan
 	} else if c.Request.Method == "POST" || c.Request.Method == "PUT" {
 		req_body, err := io.ReadAll(c.Request.Body)
 		if err != nil {
-			err = TennisApiError{errorType: InternalServerError, message: err.Error()}
+			err = constant.TennisApiError{ErrorType: constant.InternalServerError, Message: err.Error()}
 			err_response := Response{
 				Success: false,
 				Message: err.Error(),
 				Data:    nil,
 			}
-			c.JSON(err.(TennisApiError).ToHttpStatus(), err_response)
+			c.JSON(err.(constant.TennisApiError).ToHttpStatus(), err_response)
 			return
 		}
 
 		err = json.Unmarshal(req_body, &params)
 		if err != nil {
-			err = TennisApiError{errorType: MalformedData, message: "json parse failed"}
+			err = constant.TennisApiError{ErrorType: constant.MalformedData, Message: "json parse failed"}
 			err_response := Response{
 				Success: false,
 				Message: err.Error(),
 				Data:    nil,
 			}
-			c.JSON(err.(TennisApiError).ToHttpStatus(), err_response)
+			c.JSON(err.(constant.TennisApiError).ToHttpStatus(), err_response)
 			return
 		}
 	}
@@ -69,11 +70,11 @@ func makeResponse(s *SessionManager, c *gin.Context, callback func(s *SessionMan
 			Data:    nil,
 		}
 		switch v := err.(type) {
-		case TennisApiError:
-			err_response.Code = int(v.errorType)
+		case constant.TennisApiError:
+			err_response.Code = int(v.ErrorType)
 			c.JSON(v.ToHttpStatus(), err_response)
 		default:
-			err_response.Code = int(InternalServerError)
+			err_response.Code = int(constant.InternalServerError)
 			c.JSON(http.StatusInternalServerError, err_response)
 		}
 		return
@@ -106,17 +107,53 @@ func decodeParams[T interface{}](params map[string]interface{}) (*T, error) {
 		WeaklyTypedInput: true,
 	})
 	if err != nil {
-		return nil, TennisApiError{errorType: InternalServerError, message: err.Error()}
+		return nil, constant.TennisApiError{ErrorType: constant.InternalServerError, Message: err.Error()}
 	}
 	err = decoder.Decode(params)
 	if err != nil {
-		return nil, TennisApiError{errorType: MalformedData, message: "Invalid / missing parameters"}
+		return nil, constant.TennisApiError{ErrorType: constant.MalformedData, Message: "Invalid / missing parameters"}
 	}
 	return &param, nil
 }
 func restVersion(s *SessionManager, c *gin.Context) {
 	makeResponse(s, c, func(s *SessionManager, _ map[string]interface{}) (interface{}, error) {
 		return s.Version()
+	})
+}
+func restCheckRootAdminToken(s *SessionManager, c *gin.Context) {
+	makeResponse(s, c, func(s *SessionManager, params map[string]interface{}) (interface{}, error) {
+		param, err := decodeParams[RootAdminTokenParams](params)
+		if err != nil {
+			return nil, err
+		}
+		return s.CheckRootAdminToken(param), nil
+	})
+}
+func restCreateInvitation(s *SessionManager, c *gin.Context) {
+	makeResponse(s, c, func(s *SessionManager, params map[string]interface{}) (interface{}, error) {
+		param, err := decodeParams[RootAdminTokenParams](params)
+		if err != nil {
+			return nil, err
+		}
+		return s.CreateInvitation(param)
+	})
+}
+func restCheckInvitation(s *SessionManager, c *gin.Context) {
+	makeResponse(s, c, func(s *SessionManager, params map[string]interface{}) (interface{}, error) {
+		param, err := decodeParams[CheckInvitationParams](params)
+		if err != nil {
+			return nil, err
+		}
+		return s.CheckInvitation(param)
+	})
+}
+func restSignUp(s *SessionManager, c *gin.Context) {
+	makeResponse(s, c, func(s *SessionManager, params map[string]interface{}) (interface{}, error) {
+		param, err := decodeParams[SignUpParams](params)
+		if err != nil {
+			return nil, err
+		}
+		return s.SignUp(param)
 	})
 }
 func restLogin(s *SessionManager, c *gin.Context) {
@@ -156,13 +193,13 @@ func restChangePasswd(s *SessionManager, c *gin.Context) {
 		return nil, s.ChangePasswd(param)
 	})
 }
-func restChangeNetIdPasswd(s *SessionManager, c *gin.Context) {
+func restChangeIdentity(s *SessionManager, c *gin.Context) {
 	makeResponse(s, c, func(s *SessionManager, params map[string]interface{}) (interface{}, error) {
-		param, err := decodeParams[ChangeNetIdPasswdParams](params)
+		param, err := decodeParams[ChangeIdentityParams](params)
 		if err != nil {
 			return nil, err
 		}
-		return nil, s.ChangeNetIdPasswd(param)
+		return nil, s.ChangeIdentity(param)
 	})
 }
 
@@ -175,13 +212,23 @@ func restPlaceReservation(s *SessionManager, c *gin.Context) {
 		return s.PlaceReservation(param)
 	})
 }
-func restCancelReservation(s *SessionManager, c *gin.Context) {
+
+func restAuthorize(s *SessionManager, c *gin.Context) {
+	makeResponse(s, c, func(s *SessionManager, params map[string]interface{}) (interface{}, error) {
+		param, err := decodeParams[AuthorizeParams](params)
+		if err != nil {
+			return nil, err
+		}
+		return nil, s.Authorize(param)
+	})
+}
+func restDeleteReservation(s *SessionManager, c *gin.Context) {
 	makeResponse(s, c, func(s *SessionManager, params map[string]interface{}) (interface{}, error) {
 		param, err := decodeParams[CancelReservationParams](params)
 		if err != nil {
 			return nil, err
 		}
-		return nil, s.CancelReservation(param)
+		return nil, s.DeleteReservation(param)
 	})
 }
 func restGetReservations(s *SessionManager, c *gin.Context) {
@@ -198,14 +245,21 @@ func ServeHTTP(s *SessionManager, port int) {
 	r := gin.Default()
 
 	r.GET("/api/version", func(c *gin.Context) { restVersion(s, c) })
+
+	r.GET("/api/admin/token", func(c *gin.Context) { restCheckRootAdminToken(s, c) })
+	r.POST("/api/admin/invitation", func(c *gin.Context) { restCreateInvitation(s, c) })
+
+	r.GET("/api/invitation", func(c *gin.Context) { restCheckInvitation(s, c) })
+	r.POST("/api/signup", func(c *gin.Context) { restSignUp(s, c) })
 	r.GET("/api/login", func(c *gin.Context) { restGetLoginAccount(s, c) })
 	r.POST("/api/login", func(c *gin.Context) { restLogin(s, c) })
 	r.DELETE("/api/login", func(c *gin.Context) { restSignOut(s, c) })
 	r.PUT("/api/passwd", func(c *gin.Context) { restChangePasswd(s, c) })
-	r.PUT("/api/netid_passwd", func(c *gin.Context) { restChangeNetIdPasswd(s, c) })
+	r.PUT("/api/netid_passwd", func(c *gin.Context) { restChangeIdentity(s, c) })
 
 	r.POST("/api/reservations", func(c *gin.Context) { restPlaceReservation(s, c) })
+	r.POST("/api/authorization", func(c *gin.Context) { restAuthorize(s, c) })
 	r.GET("/api/reservations", func(c *gin.Context) { restGetReservations(s, c) })
-	r.DELETE("/api/reservations", func(c *gin.Context) { restCancelReservation(s, c) })
+	r.DELETE("/api/reservations", func(c *gin.Context) { restDeleteReservation(s, c) })
 	r.Run(fmt.Sprintf("0.0.0.0:%d", port))
 }

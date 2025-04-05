@@ -1,6 +1,7 @@
 package constant
 
 import (
+	"net/http"
 	"time"
 
 	"github.com/endaytrer/court_reserver_interface"
@@ -26,4 +27,71 @@ func (t SingleBookCompatible) Convert() court_reserver_interface.SingleBook {
 		Duration:            time.Duration(t.DurationSec) * time.Second,
 		CourtNamePreference: court_name_pref,
 	}
+}
+
+const DEFAULT_PAYMENT_PASSWD = "888888"
+
+
+type TennisApiErrorType int
+
+type TennisApiError struct {
+	ErrorType TennisApiErrorType
+	Message   string
+}
+
+const (
+	NoError TennisApiErrorType = iota
+	InternalServerError
+	MalformedData
+	NonExistAccount
+	InvalidAccount
+	WrongPasswd
+	InvalidPasswd
+	NotLoggedIn
+	InvalidQuery
+)
+
+func (t TennisApiError) Error() string {
+	switch t.ErrorType {
+	case InternalServerError:
+		return "Internal Server Error: " + t.Message
+	case MalformedData:
+		return "Malformed Data: " + t.Message
+	case NonExistAccount:
+		return "Account Not Existed"
+	case InvalidAccount:
+		return "Invalid Account: " + t.Message
+	case WrongPasswd:
+		return "Wrong Passwd"
+	case InvalidPasswd:
+		return "Invalid Passwd"
+	case NotLoggedIn:
+		return "Not Logged In"
+	case InvalidQuery:
+		return "Invalid Query: " + t.Message
+	}
+	panic("Error not covered")
+}
+
+func (t TennisApiError) ToHttpStatus() int {
+
+	switch t.ErrorType {
+	case InternalServerError:
+		return http.StatusInternalServerError
+	case MalformedData:
+		return http.StatusBadRequest
+	case NonExistAccount:
+		return http.StatusForbidden
+	case InvalidAccount:
+		return http.StatusForbidden
+	case WrongPasswd:
+		return http.StatusForbidden
+	case InvalidPasswd:
+		return http.StatusForbidden
+	case NotLoggedIn:
+		return http.StatusForbidden
+	case InvalidQuery:
+		return http.StatusBadRequest
+	}
+	panic("Error not covered")
 }
