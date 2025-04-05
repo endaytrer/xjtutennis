@@ -22,6 +22,12 @@ function StatusTag(props: { status: number }) {
         Success
       </span>
     );
+  } else if (props.status === 2) {
+    return (
+      <span className="uppercase text-xs font-bold p-0.5 rounded-md border-2 bg-orange-100 dark:bg-orange-900 border-orange-300 dark:border-orange-600 text-orange-500 dark:text-orange-400">
+        Need Payment
+      </span>
+    );
   }
   return (
     <span className="uppercase text-xs font-bold p-0.5 rounded-md border-2 bg-red-100 dark:bg-red-900 border-red-300 dark:border-red-600 text-red-500 dark:text-red-400">

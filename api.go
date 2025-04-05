@@ -365,7 +365,11 @@ func (t *SessionManager) PlaceReservation(params *PlaceReservationParams) (int64
 	if err != nil || date.Before(today_start) {
 		return -1, TennisApiError{MalformedData, "Invalid date"}
 	}
-	reservation_date := date.Add(-time.Duration(court_reserver_interface.SiteLookahead(params.Reservation.Site)) * 24 * time.Hour)
+	var reservation_date time.Time
+	if t.reserverPlugin != nil {
+
+		reservation_date = date.Add(-time.Duration(t.reserverPlugin.SiteLookahead(params.Reservation.Site)) * 24 * time.Hour)
+	}
 	res_y, res_m, res_d := reservation_date.Date()
 	reservation_booking_start := time.Date(res_y, res_m, res_d, 0, 0, 0, 0, t.timeZone).Add(BOOKING_START)
 
@@ -416,8 +420,7 @@ func (t *SessionManager) PlaceReservation(params *PlaceReservationParams) (int64
 			Priority:    params.Reservation.Priority,
 		}
 		go (func() {
-			login_session := xjtuorg.New(true)
-			redir, err := login_session.Login(t.reserverPlugin.LoginURL, account.NetId, account.NetIdPasswd)
+			redir, err := xjtuorg.Login(true, t.reserverPlugin.LoginURL, account.NetId, account.NetIdPasswd)
 
 			// cannot login, return all failed.
 			// reuse login

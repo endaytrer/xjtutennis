@@ -95,8 +95,7 @@ func (t *ReservationHandler) wakeUp(date string) error {
 	for netid := range reserver_info {
 		fmt.Printf("[Info] Totally %d bookings found for today in account %s\n", len(reserver_info[netid]), netid)
 		go (func() {
-			login_session := xjtuorg.New(true)
-			redir, err := login_session.Login(t.reserverPlugin.LoginURL, netid, reserver_passwds[netid])
+			redir, err := xjtuorg.Login(true, t.reserverPlugin.LoginURL, netid, reserver_passwds[netid])
 
 			// cannot login, return all failed.
 			// reuse login

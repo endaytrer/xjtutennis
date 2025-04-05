@@ -12,7 +12,6 @@ import (
 	_ "github.com/mattn/go-sqlite3"
 )
 
-const http_port = 25571
 
 func usage(program string) {
 	fmt.Fprintf(os.Stderr, "usage: %s captcha_url\n", program)
@@ -24,9 +23,10 @@ type mainArgs struct {
 
 func main() {
 	var reserver_plugin_path, challenge_url string
+	var http_port int
 	flag.StringVar(&reserver_plugin_path, "reserver-plugin", "", "If provided, choose the reserver plugin of XJTUTennis")
 	flag.StringVar(&challenge_url, "challenge-url", "", "Must be given if reserverPlugin is given")
-
+	flag.IntVar(&http_port, "port", 25571, "the port of serving")
 	flag.Parse()
 
 	if reserver_plugin_path != "" && challenge_url == "" {
