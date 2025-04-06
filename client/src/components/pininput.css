@@ -1,0 +1,7 @@
+.pin-input:focus > .pin-digit.current {
+    border-color: rgb(96 165 250);
+}
+
+.pin-input.full:focus {
+    border-color: rgb(96 165 250);
+}
