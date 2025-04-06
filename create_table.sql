@@ -1,6 +1,6 @@
 PRAGMA foreign_keys = 1;
 
-CREATE TABLE `users` (
+CREATE TABLE IF NOT EXISTS `users` (
     `user` TEXT NOT NULL PRIMARY KEY,
     `passwd` TEXT NOT NULL,
     `netid` TEXT NOT NULL,
@@ -9,8 +9,8 @@ CREATE TABLE `users` (
     `payment_passwd` BLOB NOT NULL
 );
 
-CREATE TABLE `reservations` (
-    `uid` INTEGER PRIMARY KEY AUTOINCREMENT,
+CREATE TABLE IF NOT EXISTS `reservations` (
+    `uid` INTEGER NOT NULL PRIMARY KEY,
     `user` TEXT NOT NULL,
     `date` TEXT NOT NULL,
     `site` INTEGER NOT NULL,
@@ -24,6 +24,6 @@ CREATE TABLE `reservations` (
     FOREIGN KEY(`user`) REFERENCES `users`(`user`) ON UPDATE CASCADE ON DELETE CASCADE
 );
 
-CREATE TABLE `invitations` (
+CREATE TABLE IF NOT EXISTS `invitations` (
     `code` TEXT NOT NULL PRIMARY KEY
 );
