@@ -19,10 +19,6 @@
 
 ```bash
 ./init.sh
-# Also edit `user_data.csv` and append lines for accounts:
-#     username,password,NetId,NetId Password
-# Example:
-#     foo,my_password,3124100000,netid_password
 # Start server without reserver plugin:
 go run .
 # Or, start a server with reserver plugin:
