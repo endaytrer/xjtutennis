@@ -3,7 +3,7 @@ module github.com/endaytrer/xjtutennis
 go 1.23.7
 
 require (
-	github.com/endaytrer/court_reserver_interface v1.1.0
+	github.com/endaytrer/court_reserver_interface v1.2.0-alpha.1
 	github.com/endaytrer/xjtuorg v1.1.0
 	github.com/gin-gonic/gin v1.10.0
 	github.com/go-viper/mapstructure/v2 v2.2.1
