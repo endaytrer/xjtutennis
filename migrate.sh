@@ -12,7 +12,7 @@ do
     netids+=("$f3")
 done < "$csv_file"
 
-echo 'BEGIN TRANSACTIONS;'
+echo 'BEGIN TRANSACTION;'
 echo 'ALTER TABLE reservations RENAME TO old_reservations;'
 cat create_table.sql
 echo

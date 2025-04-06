@@ -39,7 +39,7 @@ fi
 echo "Server build done."
 
 cp -a LICENSE README.md build
-cp -a create_table.sql init.sh clear_reservations.sh build/server
+cp -a create_table.sql init.sh clear_reservations.sh migrate.sh build/server
 mv $EXE build/server/
 
 # build client
