@@ -267,11 +267,11 @@ function ReservationDetail(props: {
                   if (
                     await dialog(
                       "Confirm",
-                      "Cancel reservation",
-                      "Do you really want to cancel the reservation?"
+                      "Delete reservation",
+                      "Do you really want to delete the reservation?"
                     )
                   ) {
-                    await cancelReservation(
+                    await deleteReservation(
                       props.status.Uid,
                       props.setErrorMsg,
                       props.setResList
@@ -312,7 +312,7 @@ function ReservationDetail(props: {
     </>
   );
 }
-async function cancelReservation(
+async function deleteReservation(
   Uid: string,
   setErrorMsg: (msg: string) => void,
   setResList: (
@@ -457,16 +457,6 @@ function Dashboard(props: { user: string }) {
 }
 
 export default function DashboardPage() {
-    const [user, setUser] = useState("ERROR not set");
-    const [_, setNetId] = useState("ERROR not set");
-    useEffect(() => {
-      request("/login", "GET")
-        .catch(() => (window.location.href = "/"))
-        .then((resp) => {
-          const { User, NetId } = resp;
-          setUser(User);
-          setNetId(NetId);
-        });
-    }, []);
-  return <App><Dashboard user={user}></Dashboard></App>
+  const [user, setUser] = useState("unknown");
+  return <App setUser={setUser}><Dashboard user={user}></Dashboard></App>
 }

@@ -4,6 +4,6 @@ export default {
   appDirectory: "src",
   ssr: false,
   async prerender() {
-    return ["/", "/dashboard", "/reserve", "/people", "/admin", "/signup"]
+    return ["/", "/dashboard", "/reserve", "/people", "/admin", "/signup", "/user"]
   }
 } satisfies Config;

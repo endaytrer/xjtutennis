@@ -9,6 +9,7 @@ import App from "../components/App";
 async function placeReservation(e: React.FormEvent, resRequest: ReserveRequest, setErrorMsg: (msg: string) => void) {
     e.preventDefault();
     try {
+        console.log("authorize")
         const resp: PlaceReservationResponse = await request("/reservations", "POST", undefined, {Reservation: resRequest});
         if (resp.NeedAuthorization) {
             let authorizePassword = sessionStorage.getItem("sessionAuthorizePasswd")
@@ -34,9 +35,12 @@ async function placeReservation(e: React.FormEvent, resRequest: ReserveRequest, 
                     }
                 }
             }
-            window.location.href = "/dashboard"
+        } else {
+            await dialog("Info", "Info", "Reservation placed successfully.");
         }
+        window.location.href = "/dashboard"
     } catch (e) {
+        console.log("authorize fail")
         if (e instanceof RequestErr) {
             setErrorMsg(e.message)
         } else {
@@ -124,7 +128,7 @@ function SingleCourt(props: { preference: Preference, deletable?: boolean, delet
                     {c}
                     </div>))
             }</div>
-            <div className="flex mt-1 mb-4">
+            <div className="flex mt-1 mb-4 w-full">
                 <input type="text"
                     value={newCourtName}
                     onChange={(e) => setNewCourtName(e.target.value)}
@@ -156,7 +160,7 @@ function SingleCourt(props: { preference: Preference, deletable?: boolean, delet
                             setNewCourtName("");
                         }
                     }}
-                    className="p-1 rounded-md outline-none border-2 border-transparent focus:border-blue-400 bg-gray-50 dark:bg-zinc-600 flex-1 invalid:border-red-400" />
+                    className="w-full p-1 rounded-md outline-none border-2 border-transparent focus:border-blue-400 bg-gray-50 dark:bg-zinc-600 flex-1 invalid:border-red-400" />
                 <button className="py-1 px-2 rounded-md ml-2 bg-slate-200 hover:bg-slate-300 dark:bg-zinc-500 dark:hover:bg-slate-400 invalid:border-red-400" onClick={(e) => {
                     e.preventDefault();
                     if (newCourtName !== "" && !courtNames.includes(newCourtName)) {

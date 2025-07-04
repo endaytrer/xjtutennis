@@ -255,7 +255,7 @@ func ServeHTTP(s *SessionManager, port int) {
 	r.POST("/api/login", func(c *gin.Context) { restLogin(s, c) })
 	r.DELETE("/api/login", func(c *gin.Context) { restSignOut(s, c) })
 	r.PUT("/api/passwd", func(c *gin.Context) { restChangePasswd(s, c) })
-	r.PUT("/api/netid_passwd", func(c *gin.Context) { restChangeIdentity(s, c) })
+	r.PUT("/api/identity", func(c *gin.Context) { restChangeIdentity(s, c) })
 
 	r.POST("/api/reservations", func(c *gin.Context) { restPlaceReservation(s, c) })
 	r.POST("/api/authorization", func(c *gin.Context) { restAuthorize(s, c) })

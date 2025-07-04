@@ -12,6 +12,7 @@ export default [
   route("/reserve", "pages/Reservation.tsx"),
   route("/people", "pages/People.tsx"),
   route("/signup", "pages/SignUp.tsx"),
+  route("/user", "pages/User.tsx"),
   route("/", "pages/Login.tsx"),
   route("*?", "pages/catchall.tsx"),
 ] satisfies RouteConfig;

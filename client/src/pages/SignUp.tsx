@@ -5,6 +5,7 @@ import logo from "../assets/regular-no-gradient-8x.png"
 import darkLogo from "../assets/dark-logo-8x.png"
 import { dialog } from "../components/Dialog";
 import PinInput from "../components/PinInput";
+import { escapeRegExp } from "../utils";
 
 async function signup(e: React.FormEvent, InvitationCode: string, User: string, Passwd: string, NetId: string, NetIdPasswd: string, PaymentPasswd: string | null, setErrorMsg: (msg: string) => void) {
     e.preventDefault();
@@ -35,9 +36,6 @@ async function signup(e: React.FormEvent, InvitationCode: string, User: string, 
     //         setErrorMsg("Service is temporally unavailable!")
     //     }
     // }
-}
-function escapeRegExp(str: string) {
-    return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); // $& means the whole matched string
 }
 
 export default function SignUp() {

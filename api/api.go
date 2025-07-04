@@ -313,11 +313,11 @@ func (t *SessionManager) ChangeIdentity(params *ChangeIdentityParams) error {
 func (t *SessionManager) WriteAccounts(new_account auth.User, account *auth.User) error {
 
 	// Write back to user database
-	_, err := t.conn.ExecContext(context.Background(), "UPDATE `users` SET `password` = ?, `salt` = ?, `netid_passwd` = ?, `payment_passwd` = ? WHERE `user` = ?",
+	_, err := t.conn.ExecContext(context.Background(), "UPDATE `users` SET `passwd` = ?, `salt` = ?, `netid_passwd` = ?, `payment_passwd` = ? WHERE `user` = ?",
 		new_account.Passwd, new_account.Salt, new_account.NetIdPasswd, new_account.PaymentPasswd, new_account.User)
 
 	if err != nil {
-		return constant.TennisApiError{ErrorType: constant.InternalServerError, Message: "SQL transaction error"}
+		return constant.TennisApiError{ErrorType: constant.InternalServerError, Message: err.Error()}
 	}
 
 	// Now transaction is done. No error would happen after now.

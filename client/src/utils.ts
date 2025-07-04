@@ -31,3 +31,7 @@ export function formatDuration(timeSec: number): string {
     }
     return ans;
 }
+
+export function escapeRegExp(str: string) {
+    return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); // $& means the whole matched string
+}
