@@ -9,17 +9,12 @@ import (
 	"time"
 
 	"github.com/endaytrer/court_reserver_interface/captcha_solver"
+	"github.com/endaytrer/xjtutennis/api"
+	"github.com/endaytrer/xjtutennis/auth"
+	"github.com/endaytrer/xjtutennis/plugins"
+	"github.com/google/uuid"
 	_ "github.com/mattn/go-sqlite3"
 )
-
-
-func usage(program string) {
-	fmt.Fprintf(os.Stderr, "usage: %s captcha_url\n", program)
-	os.Exit(2)
-}
-
-type mainArgs struct {
-}
 
 func main() {
 	var reserver_plugin_path, challenge_url string
@@ -34,10 +29,16 @@ func main() {
 		flag.Usage()
 		os.Exit(1)
 	}
-	var court_reserver *CourtReserverPlugin
+
+	
+	root_admin_token := uuid.New()
+	fmt.Printf("Visit /admin?token=%s to access admin portal.\n", root_admin_token.String())
+
+	authorization_cache := auth.NewAuthorizationCache()
+	var court_reserver *plugins.CourtReserverPlugin
 	var err error
 	if reserver_plugin_path != "" {
-		court_reserver, err = loadCourtReserver(reserver_plugin_path)
+		court_reserver, err = plugins.LoadCourtReserver(reserver_plugin_path)
 		if err != nil {
 			panic(fmt.Sprintf("Cannot load reserver plugin: %s", err.Error()))
 		}
@@ -57,7 +58,7 @@ func main() {
 		solver = court_reserver.NewCaptchaSolver(challenge_url)
 	}
 
-	session_mgr, err := NewSessionManager(conn_session, solver, court_reserver)
+	session_mgr, err := api.NewSessionManager(conn_session, solver, court_reserver, authorization_cache, root_admin_token)
 	if err != nil {
 		panic("session manager creation failed")
 	}
@@ -67,11 +68,11 @@ func main() {
 		if err != nil {
 			panic("db connection failed")
 		}
-		reserver := NewReservationHandler(conn_reserver, solver, court_reserver)
+		reserver := plugins.NewReservationHandler(conn_reserver, solver, court_reserver, authorization_cache)
 		go reserver.MainEvent()
 	} else {
 		fmt.Printf("[Info] %s The program is running without a reserver. You can still place reservations, but none of them will be served.\n", time.Now().Format(time.RFC3339))
 	}
 
-	ServeHTTP(session_mgr, http_port)
+	api.ServeHTTP(session_mgr, http_port)
 }

@@ -10,8 +10,12 @@ export interface Reservation {
     Preferences: Preference[],
     Priority: number,
 }
+export interface PlaceReservationResponse {
+    Uid: string,
+    NeedAuthorization: boolean,
+}
 export interface ReservationStatus {
-    Uid: number,
+    Uid: string,
     Reservation: Reservation,
     Status: {
         Code: number,

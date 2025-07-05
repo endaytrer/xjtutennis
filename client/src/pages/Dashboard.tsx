@@ -4,8 +4,9 @@ import { Preference, ReservationResponse, ReservationStatus } from "../api";
 import { formatTime } from "../utils";
 import { Link } from "react-router";
 import { NextPage, PrevPage, RightArrow } from "../components/icons";
-import { dialog } from "../components/Dialog";
+import { authorize, dialog } from "../components/Dialog";
 import App from "../components/App";
+import sites from "../sites";
 
 import trashcan from "../assets/trashcan.svg";
 
@@ -26,6 +27,12 @@ function StatusTag(props: { status: number }) {
     return (
       <span className="uppercase text-xs font-bold p-0.5 rounded-md border-2 bg-orange-100 dark:bg-orange-900 border-orange-300 dark:border-orange-600 text-orange-500 dark:text-orange-400">
         Need Payment
+      </span>
+    );
+  } else if (props.status === 4) {
+    return (
+      <span className="uppercase text-xs font-bold p-0.5 rounded-md border-2 bg-purple-100 dark:bg-purple-900 border-purple-300 dark:border-purple-600 text-purple-500 dark:text-purple-400">
+        Need Authorization
       </span>
     );
   }
@@ -68,49 +75,10 @@ function PriorityTag(props: { priority: number }) {
   );
 }
 function site(s: number): string {
-  switch (s) {
-    case 301:
-      return "兴庆校区东南网球场";
-    case 181:
-      return "滚筒自行车骑行";
-    case 161:
-      return "测试场馆（勿订）";
-    case 53:
-      return "兴庆校区风雨棚网球场";
-    case 42:
-      return "兴庆校区文体中心三楼羽毛球场地";
-    case 121:
-      return "健身房（分时段限流）";
-    case 43:
-      return "兴庆校区文体中心乒乓球馆";
-    case 41:
-      return "兴庆校区文体中心一楼羽毛球馆";
-    case 55:
-      return "兴庆校区文体中心网球馆";
-    case 56:
-      return "兴庆校区文体中心壁球馆";
-    case 82:
-      return "创新港主楼网球场";
-    case 44:
-      return "兴庆校区文体中心一楼健身房";
-    case 105:
-      return "创新港三号巨构乒乓球台";
-    case 103:
-      return "创新港二号巨构羽毛球场";
-    case 52:
-      return "兴庆校区东门网球场";
-    case 104:
-      return "创新港三号巨构羽毛球场";
-    case 102:
-      return "创新港一号巨构乒乓球台";
-    case 101:
-      return "创新港一号巨构羽毛球场";
-    case 54:
-      return "兴庆校区南门网球场";
-    case 51:
-      return "医学校区网球场";
-    case 50:
-      return "雁塔校区财经乒乓球馆";
+  for (const {name, id} of sites) {
+    if (id === s) {
+      return name
+    }
   }
   return "Unknown Court";
 }
@@ -171,8 +139,9 @@ function ReservationDetail(props: {
   setResList: (
     callback: (old: ReservationStatus[]) => ReservationStatus[]
   ) => void;
+  update: () => void;
 }) {
-  const expandable = props.status.Status.Code !== 0;
+  const expandable = props.status.Status.Code !== 0 && props.status.Status.Code !== 4;
   const successful = props.status.Status.Code === 1;
   const [expanded, setExpanded] = useState(false);
   return (
@@ -218,7 +187,7 @@ function ReservationDetail(props: {
           <StatusTag status={props.status.Status.Code} />
         </td>
         <td className="p-3 align-top select-none">
-          <div className="w-full h-full flex items-center justify-start">
+          <div className="w-full h-full flex items-center justify-between">
             <Link
               to={`/reserve?reservation=${encodeURI(
                 JSON.stringify(props.status.Reservation)
@@ -227,8 +196,33 @@ function ReservationDetail(props: {
             >
               Rebook
             </Link>
-            {props.status.Status.Code == 0 && (
-              <button
+            {props.status.Status.Code == 4 && <button
+              className="h-7 px-3 ml-2 inline-flex items-center justify-center rounded-full shadow-md bg-purple-200 dark:bg-purple-700"
+              onClick={async (e) => {
+                e.preventDefault()
+                const passwd = await authorize()
+                if (passwd === undefined) {
+                  return;
+                }
+                
+                try {
+                  await request("/authorization", "POST", {}, {
+                      Uid: props.status.Uid,
+                      Passwd: passwd
+                  }) 
+                  await dialog("Info", "Info", "Authorized successfully.");
+                  props.update()
+                } catch (e) {
+                  if (e instanceof RequestErr) {
+                      await dialog("Info", "Error", e.message)
+                  } else {
+                      await dialog("Info", "Error", String(e))
+                  }
+                }
+              }}>
+              Authorize
+            </button>}
+            <button
                 className="h-7 w-7 p-2 ml-2 inline-flex bg-red-600 rounded-full"
                 onClick={async (e) => {
                   e.preventDefault();
@@ -247,9 +241,8 @@ function ReservationDetail(props: {
                   }
                 }}
               >
-                <img src={trashcan} alt="Delete" className="" />
-              </button>
-            )}
+              <img src={trashcan} alt="Delete" className="" />
+            </button>
           </div>
         </td>
       </tr>
@@ -282,7 +275,7 @@ function ReservationDetail(props: {
   );
 }
 async function cancelReservation(
-  Uid: number,
+  Uid: string,
   setErrorMsg: (msg: string) => void,
   setResList: (
     callback: (old: ReservationStatus[]) => ReservationStatus[]
@@ -308,6 +301,7 @@ function Dashboard(props: { user: string }) {
   const [page, setPage] = useState(0);
   const [resList, setResList] = useState<ReservationStatus[]>([]);
   const [errorMsg, setErrorMsg] = useState<string>();
+  const [updateHook, setUpdateHook] = useState(false);
   useEffect(() => {
     request("/reservations", "GET", {
       Page: `${page}`,
@@ -324,7 +318,7 @@ function Dashboard(props: { user: string }) {
         setResList(resp.Result);
         setResCount(resp.Count);
       });
-  }, [rowsPerPage, page]);
+  }, [rowsPerPage, page, updateHook]);
   return (
     <div className="w-full">
       <h1 className="text-slate-900 dark:text-white text-2xl my-5">
@@ -365,6 +359,7 @@ function Dashboard(props: { user: string }) {
                 status={v}
                 setErrorMsg={setErrorMsg}
                 setResList={setResList}
+                update={() => setUpdateHook((t) => !t)}
               />
             ))}
           </tbody>
