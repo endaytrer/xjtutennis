@@ -6,6 +6,7 @@ import { Link } from "react-router";
 import { NextPage, PrevPage, RightArrow } from "../components/icons";
 import { authorize, dialog } from "../components/Dialog";
 import App from "../components/App";
+import sites from "../sites";
 
 import trashcan from "../assets/trashcan.svg";
 
@@ -74,49 +75,10 @@ function PriorityTag(props: { priority: number }) {
   );
 }
 function site(s: number): string {
-  switch (s) {
-    case 301:
-      return "兴庆校区东南网球场";
-    case 181:
-      return "滚筒自行车骑行";
-    case 161:
-      return "测试场馆（勿订）";
-    case 53:
-      return "兴庆校区风雨棚网球场";
-    case 42:
-      return "兴庆校区文体中心三楼羽毛球场地";
-    case 121:
-      return "健身房（分时段限流）";
-    case 43:
-      return "兴庆校区文体中心乒乓球馆";
-    case 41:
-      return "兴庆校区文体中心一楼羽毛球馆";
-    case 55:
-      return "兴庆校区文体中心网球馆";
-    case 56:
-      return "兴庆校区文体中心壁球馆";
-    case 82:
-      return "创新港主楼网球场";
-    case 44:
-      return "兴庆校区文体中心一楼健身房";
-    case 105:
-      return "创新港三号巨构乒乓球台";
-    case 103:
-      return "创新港二号巨构羽毛球场";
-    case 52:
-      return "兴庆校区东门网球场";
-    case 104:
-      return "创新港三号巨构羽毛球场";
-    case 102:
-      return "创新港一号巨构乒乓球台";
-    case 101:
-      return "创新港一号巨构羽毛球场";
-    case 54:
-      return "兴庆校区南门网球场";
-    case 51:
-      return "医学校区网球场";
-    case 50:
-      return "雁塔校区财经乒乓球馆";
+  for (const {name, id} of sites) {
+    if (id === s) {
+      return name
+    }
   }
   return "Unknown Court";
 }
