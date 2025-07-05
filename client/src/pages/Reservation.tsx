@@ -1,18 +1,41 @@
 import { useEffect, useState } from "react";
 import sites from "../sites";
 
-import { IdClosure, Preference, Reservation as ReserveRequest } from "../api";
+import { IdClosure, PlaceReservationResponse, Preference, Reservation as ReserveRequest } from "../api";
 import { request, RequestErr } from "../request";
 import { formatTime, parseTime, formatDuration } from "../utils";
-import { dialog } from "../components/Dialog";
+import { authorize, dialog } from "../components/Dialog";
 import App from "../components/App";
 async function placeReservation(e: React.FormEvent, resRequest: ReserveRequest, setErrorMsg: (msg: string) => void) {
     e.preventDefault();
     try {
-        console.log(resRequest)
-        await request("/reservations", "POST", undefined, {Reservation: resRequest});
-        await dialog("Info", "Info", "Reservation placed successfully.");
-        window.location.href = "/dashboard"
+        const resp: PlaceReservationResponse = await request("/reservations", "POST", undefined, {Reservation: resRequest});
+        if (resp.NeedAuthorization) {
+            let authorizePassword = sessionStorage.getItem("sessionAuthorizePasswd")
+
+            if (authorizePassword === null) {
+                let authorized: string | undefined = await authorize()
+                if (authorized !== undefined) {
+                    authorizePassword = authorized
+                } 
+            }
+            if (authorizePassword !== null) {
+                try {
+                    await request("/authorization", "POST", {}, {
+                        Uid: resp.Uid,
+                        Passwd: authorizePassword
+                    }) 
+                    await dialog("Info", "Info", "Reservation placed successfully.");
+                } catch (e) {
+                    if (e instanceof RequestErr) {
+                        await dialog("Info", "Error", `${e.message}. You can still authorize in the dashboard page.`)
+                    } else {
+                        await dialog("Info", "Error", `${String(e)}. You can still authorize in the dashboard page.`)
+                    }
+                }
+            }
+            window.location.href = "/dashboard"
+        }
     } catch (e) {
         if (e instanceof RequestErr) {
             setErrorMsg(e.message)
@@ -194,7 +217,7 @@ function Reservation() {
             setSite(reservation.Site)
             setPriority(reservation.Priority)
         } catch(e) {
-
+            dialog("Info", "Warning", "Cannot load param config!")
         }
     }, [])
     return (<div className="w-full">
