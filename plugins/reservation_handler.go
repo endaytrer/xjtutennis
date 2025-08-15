@@ -10,16 +10,10 @@ import (
 
 	"github.com/endaytrer/court_reserver_interface"
 	"github.com/endaytrer/court_reserver_interface/captcha_solver"
-	"github.com/endaytrer/xjtuorg"
+	"github.com/endaytrer/xjtulogin"
 	"github.com/endaytrer/xjtutennis/auth"
 	"github.com/endaytrer/xjtutennis/constant"
 )
-
-type PasswordAuthorization struct {
-	// the authorized uid of a reservation
-	uid            int64
-	netid_password string
-}
 
 // handle delayed reservation requests
 type ReservationHandler struct {
@@ -116,7 +110,7 @@ func (t *ReservationHandler) wakeUp(date string) error {
 
 		try_authorizations:
 			for _, authorization := range reserver_authorizations[user] {
-				redir, err = xjtuorg.Login(true, t.reserverPlugin.LoginURL, authorization.NetId, string(authorization.NetIdPasswd))
+				redir, err = xjtulogin.Login(t.reserverPlugin.LoginURL, authorization.NetId, string(authorization.NetIdPasswd))
 				if err == nil {
 					break try_authorizations
 				}
