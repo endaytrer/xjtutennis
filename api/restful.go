@@ -20,7 +20,8 @@ type Response struct {
 
 func makeResponse(s *SessionManager, c *gin.Context, callback func(s *SessionManager, params map[string]interface{}) (interface{}, error)) {
 	var params map[string]interface{}
-	if c.Request.Method == "GET" || c.Request.Method == "DELETE" {
+	switch c.Request.Method {
+	case "GET", "DELETE":
 		params = make(map[string]interface{})
 		for k, v := range c.Request.URL.Query() {
 			if len(v) == 1 {
@@ -29,7 +30,7 @@ func makeResponse(s *SessionManager, c *gin.Context, callback func(s *SessionMan
 				params[k] = v
 			}
 		}
-	} else if c.Request.Method == "POST" || c.Request.Method == "PUT" {
+	case "POST", "PUT":
 		req_body, err := io.ReadAll(c.Request.Body)
 		if err != nil {
 			err = constant.TennisApiError{ErrorType: constant.InternalServerError, Message: err.Error()}

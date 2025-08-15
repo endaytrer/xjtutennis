@@ -16,7 +16,7 @@ import (
 
 	"github.com/endaytrer/court_reserver_interface"
 	"github.com/endaytrer/court_reserver_interface/captcha_solver"
-	"github.com/endaytrer/xjtuorg"
+	"github.com/endaytrer/xjtulogin"
 	"github.com/endaytrer/xjtutennis/auth"
 	"github.com/endaytrer/xjtutennis/constant"
 	"github.com/endaytrer/xjtutennis/plugins"
@@ -520,7 +520,7 @@ func (t *SessionManager) Authorize(params *AuthorizeParams) error {
 
 	if now.After(reservation_booking_start) && now.After(today_booking_start) && now.Before(today_booking_end) {
 		go (func() {
-			redir, err := xjtuorg.Login(true, t.reserverPlugin.LoginURL, authorization.NetId, string(authorization.NetIdPasswd))
+			redir, err := xjtulogin.Login(t.reserverPlugin.LoginURL, authorization.NetId, string(authorization.NetIdPasswd))
 
 			// cannot login, return all failed.
 			// reuse login
@@ -534,7 +534,7 @@ func (t *SessionManager) Authorize(params *AuthorizeParams) error {
 				return
 			}
 			reserver := t.reserverPlugin.NewCourtReserver(redir)
-			
+
 			payment_passwd := string(authorization.PaymentPasswd)
 			status := reserver.BookNow(t.timeZone, reservation, t.captchaSolver, &payment_passwd)
 
