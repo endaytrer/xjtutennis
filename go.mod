@@ -4,7 +4,7 @@ go 1.25.0
 
 require (
 	github.com/endaytrer/court_reserver_interface v1.2.0
-	github.com/endaytrer/xjtulogin v1.3.0
+	github.com/endaytrer/xjtulogin v1.3.1-alpha.1
 	github.com/gin-gonic/gin v1.12.0
 	github.com/go-viper/mapstructure/v2 v2.5.0
 	github.com/google/uuid v1.6.0
