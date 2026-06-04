@@ -6,7 +6,9 @@ import (
 	"io"
 	"net/http"
 
+	webassets "github.com/endaytrer/xjtutennis/client"
 	"github.com/endaytrer/xjtutennis/constant"
+	"github.com/gin-contrib/static"
 	"github.com/gin-gonic/gin"
 	"github.com/go-viper/mapstructure/v2"
 )
@@ -242,25 +244,36 @@ func restGetReservations(s *SessionManager, c *gin.Context) {
 	})
 }
 
-func ServeHTTP(s *SessionManager, port int) {
+func ServeHTTP(s *SessionManager, listen_addr string) {
+	fs := webassets.FS()
 	r := gin.Default()
 
-	r.GET("/api/version", func(c *gin.Context) { restVersion(s, c) })
+	r.Use(static.Serve("/", fs))
+	api := r.Group("/api")
+	{
+		api.GET("/version", func(c *gin.Context) { restVersion(s, c) })
 
-	r.GET("/api/admin/token", func(c *gin.Context) { restCheckRootAdminToken(s, c) })
-	r.POST("/api/admin/invitation", func(c *gin.Context) { restCreateInvitation(s, c) })
+		api.GET("/admin/token", func(c *gin.Context) { restCheckRootAdminToken(s, c) })
+		api.POST("/admin/invitation", func(c *gin.Context) { restCreateInvitation(s, c) })
 
-	r.GET("/api/invitation", func(c *gin.Context) { restCheckInvitation(s, c) })
-	r.POST("/api/signup", func(c *gin.Context) { restSignUp(s, c) })
-	r.GET("/api/login", func(c *gin.Context) { restGetLoginAccount(s, c) })
-	r.POST("/api/login", func(c *gin.Context) { restLogin(s, c) })
-	r.DELETE("/api/login", func(c *gin.Context) { restSignOut(s, c) })
-	r.PUT("/api/passwd", func(c *gin.Context) { restChangePasswd(s, c) })
-	r.PUT("/api/netid_passwd", func(c *gin.Context) { restChangeIdentity(s, c) })
+		api.GET("/invitation", func(c *gin.Context) { restCheckInvitation(s, c) })
+		api.POST("/signup", func(c *gin.Context) { restSignUp(s, c) })
+		api.GET("/login", func(c *gin.Context) { restGetLoginAccount(s, c) })
+		api.POST("/login", func(c *gin.Context) { restLogin(s, c) })
+		api.DELETE("/login", func(c *gin.Context) { restSignOut(s, c) })
+		api.PUT("/passwd", func(c *gin.Context) { restChangePasswd(s, c) })
+		api.PUT("/netid_passwd", func(c *gin.Context) { restChangeIdentity(s, c) })
 
-	r.POST("/api/reservations", func(c *gin.Context) { restPlaceReservation(s, c) })
-	r.POST("/api/authorization", func(c *gin.Context) { restAuthorize(s, c) })
-	r.GET("/api/reservations", func(c *gin.Context) { restGetReservations(s, c) })
-	r.DELETE("/api/reservations", func(c *gin.Context) { restDeleteReservation(s, c) })
-	r.Run(fmt.Sprintf("0.0.0.0:%d", port))
+		api.POST("/reservations", func(c *gin.Context) { restPlaceReservation(s, c) })
+		api.POST("/authorization", func(c *gin.Context) { restAuthorize(s, c) })
+		api.GET("/reservations", func(c *gin.Context) { restGetReservations(s, c) })
+		api.DELETE("/reservations", func(c *gin.Context) { restDeleteReservation(s, c) })
+
+	}
+
+	r.NoRoute(func(c *gin.Context) {
+		fmt.Printf("%s doesn't exists, redirect on /\n", c.Request.URL.Path)
+		c.FileFromFS("/__spa-fallback.html", fs)
+	})
+	r.Run(listen_addr)
 }

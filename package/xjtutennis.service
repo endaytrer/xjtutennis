@@ -1,0 +1,33 @@
+[Unit]
+Description=XJTU Tennis Court Booking System
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=xjtutennis
+Group=xjtutennis
+WorkingDirectory=/var/lib/xjtutennis
+Environment=GIN_MODE=release
+ExecStart=/usr/bin/xjtutennis -config /etc/xjtutennis/config.yaml
+Restart=on-failure
+RestartSec=5
+
+# On `systemctl stop`, signal only the main process (webadmin). webadmin traps
+# SIGTERM, issues the in-band "stop" command to the JVM so the world is saved,
+# waits for it to exit, then quits. TimeoutStopSec must exceed the config's
+# stop_timeout_seconds so the graceful save can complete before systemd kills.
+KillMode=mixed
+KillSignal=SIGTERM
+TimeoutStopSec=120
+
+# Light sandboxing. The XJTUTennis instance is located at runtime via the web
+# setup wizard and may live anywhere the service user can read/write, so
+# filesystem protections are kept permissive. To harden, add e.g.:
+#   ProtectSystem=full
+#   ReadWritePaths=/var/lib/xjtutennis
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

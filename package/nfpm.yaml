@@ -1,0 +1,48 @@
+# nfpm configuration — builds the paper-webadmin RPM.
+# Built in CI after the frontend + binary are compiled. Run from the repo root:
+#   VERSION=1.2.3 nfpm package --config package/nfpm.yaml --packager rpm --target dist/
+# nfpm expands ${ENV} references below.
+
+name: xjtutennis
+arch: amd64
+platform: linux
+version: ${VERSION}
+release: "1"
+section: default
+maintainer: "Daniel Gu <me@danielgu.org>"
+description: |
+  XJTUTennis, A Platform for Automatic XJTU Sport Court Booking
+vendor: "xjtutennis"
+homepage: "https://github.com/endaytrer/xjtutennis"
+license: "AGPL-3.0-or-later"
+
+contents:
+  - src: dist/xjtutennis
+    dst: /usr/bin/xjtutennis
+    file_info:
+      mode: 0755
+  - src: package/xjtutennis.service
+    dst: /usr/lib/systemd/system/xjtutennis.service
+    file_info:
+      mode: 0644
+  - dst: /var/lib/xjtutennis
+    type: dir
+    file_info:
+      mode: 0750
+      owner: xjtutennis
+      group: xjtutennis
+  - dst: /etc/xjtutennis
+    type: dir
+    file_info:
+      mode: 0755
+      owner: xjtutennis
+      group: xjtutennis
+
+scripts:
+  preinstall: package/scripts/preinstall.sh
+  postinstall: package/scripts/postinstall.sh
+  preremove: package/scripts/preremove.sh
+  postremove: package/scripts/postremove.sh
+
+rpm:
+  group: Applications/System
