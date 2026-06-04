@@ -4,7 +4,7 @@ go 1.25.0
 
 require (
 	github.com/endaytrer/court_reserver_interface v1.2.0
-	github.com/endaytrer/xjtulogin v1.3.0
+	github.com/endaytrer/xjtulogin v1.4.1
 	github.com/gin-contrib/static v1.1.6
 	github.com/gin-gonic/gin v1.12.0
 	github.com/go-viper/mapstructure/v2 v2.5.0
@@ -17,7 +17,7 @@ require (
 require (
 	github.com/andybalholm/cascadia v1.3.4 // indirect
 	github.com/bytedance/gopkg v0.1.4 // indirect
-	github.com/bytedance/sonic v1.15.1 // indirect
+	github.com/bytedance/sonic v1.15.2 // indirect
 	github.com/bytedance/sonic/loader v0.5.1 // indirect
 	github.com/cloudwego/base64x v0.1.7 // indirect
 	github.com/gabriel-vasile/mimetype v1.4.13 // indirect

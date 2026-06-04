@@ -110,7 +110,7 @@ func (t *ReservationHandler) wakeUp(date string) error {
 
 		try_authorizations:
 			for _, authorization := range reserver_authorizations[user] {
-				redir, err = xjtulogin.Login(t.reserverPlugin.LoginURL, authorization.NetId, string(authorization.NetIdPasswd))
+				redir, err = xjtulogin.LoginNoninteractive(t.reserverPlugin.LoginURL, authorization.NetId, string(authorization.NetIdPasswd))
 				if err == nil {
 					break try_authorizations
 				}

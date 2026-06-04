@@ -520,7 +520,7 @@ func (t *SessionManager) Authorize(params *AuthorizeParams) error {
 
 	if now.After(reservation_booking_start) && now.After(today_booking_start) && now.Before(today_booking_end) {
 		go (func() {
-			redir, err := xjtulogin.Login(t.reserverPlugin.LoginURL, authorization.NetId, string(authorization.NetIdPasswd))
+			redir, err := xjtulogin.LoginNoninteractive(t.reserverPlugin.LoginURL, authorization.NetId, string(authorization.NetIdPasswd))
 
 			// cannot login, return all failed.
 			// reuse login
