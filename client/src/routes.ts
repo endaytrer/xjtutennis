@@ -6,12 +6,13 @@ import { type RouteConfig, route } from "@react-router/dev/routes";
 //     <Route path="dashboard/*" element={<App/>} />
 //   </Routes>
 export default [
-  // * matches all URLs, the ? makes it optional so it will match / as well
-  route("/admin", "pages/Admin.tsx"),
-  route("/dashboard", "pages/Dashboard.tsx"),
-  route("/reserve", "pages/Reservation.tsx"),
-  route("/people", "pages/People.tsx"),
-  route("/signup", "pages/SignUp.tsx"),
-  route("/", "pages/Login.tsx"),
-  route("*?", "pages/catchall.tsx"),
+    // * matches all URLs, the ? makes it optional so it will match / as well
+    route("/admin", "pages/Admin.tsx"),
+    route("/dashboard", "pages/Dashboard.tsx"),
+    route("/reserve", "pages/Reservation.tsx"),
+    route("/people", "pages/People.tsx"),
+    route("/signup", "pages/SignUp.tsx"),
+    route("/settings", "pages/Settings.tsx"),
+    route("/", "pages/Login.tsx"),
+    route("*?", "pages/catchall.tsx"),
 ] satisfies RouteConfig;

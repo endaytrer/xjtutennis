@@ -3,9 +3,9 @@
 @tailwind utilities;
 
 body {
-  margin: 0;
+    margin: 0;
 }
 
 body.no-scroll {
-  overflow: hidden;
+    overflow: hidden;
 }

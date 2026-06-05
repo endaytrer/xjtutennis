@@ -92,6 +92,18 @@ func makeResponse(s *SessionManager, c *gin.Context, callback func(s *SessionMan
 			Data:    nil,
 		}
 		c.JSON(http.StatusOK, response)
+	case SignUpResponse:
+		if v.SessionId != "" {
+			c.SetCookie("session_id", string(v.SessionId), int(account_login_expiry), "/", "", false, true)
+			v.SessionId = ""
+		}
+		response := Response{
+			Success: true,
+			Code:    0,
+			Message: "",
+			Data:    v,
+		}
+		c.JSON(http.StatusOK, response)
 	default:
 		response := Response{
 			Success: true,
@@ -150,6 +162,15 @@ func restCheckInvitation(s *SessionManager, c *gin.Context) {
 		return s.CheckInvitation(param)
 	})
 }
+func restSignUpVerifyNetId(s *SessionManager, c *gin.Context) {
+	makeResponse(s, c, func(s *SessionManager, params map[string]interface{}) (interface{}, error) {
+		param, err := decodeParams[VerifyNetIdParams](params)
+		if err != nil {
+			return nil, err
+		}
+		return s.VerifyNetId(param)
+	})
+}
 func restSignUp(s *SessionManager, c *gin.Context) {
 	makeResponse(s, c, func(s *SessionManager, params map[string]interface{}) (interface{}, error) {
 		param, err := decodeParams[SignUpParams](params)
@@ -157,6 +178,24 @@ func restSignUp(s *SessionManager, c *gin.Context) {
 			return nil, err
 		}
 		return s.SignUp(param)
+	})
+}
+func restSignUpSendOtp(s *SessionManager, c *gin.Context) {
+	makeResponse(s, c, func(s *SessionManager, params map[string]interface{}) (interface{}, error) {
+		param, err := decodeParams[SignUpSendOtpParams](params)
+		if err != nil {
+			return nil, err
+		}
+		return s.SignUpSendOtp(param)
+	})
+}
+func restSignUpSubmitOtp(s *SessionManager, c *gin.Context) {
+	makeResponse(s, c, func(s *SessionManager, params map[string]interface{}) (interface{}, error) {
+		param, err := decodeParams[SignUpSubmitOtpParams](params)
+		if err != nil {
+			return nil, err
+		}
+		return s.SignUpSubmitOtp(param)
 	})
 }
 func restLogin(s *SessionManager, c *gin.Context) {
@@ -258,6 +297,9 @@ func ServeHTTP(s *SessionManager, listen_addr string) {
 
 		api.GET("/invitation", func(c *gin.Context) { restCheckInvitation(s, c) })
 		api.POST("/signup", func(c *gin.Context) { restSignUp(s, c) })
+		api.POST("/signup/verify_netid", func(c *gin.Context) { restSignUpVerifyNetId(s, c) })
+		api.POST("/signup/send_otp", func(c *gin.Context) { restSignUpSendOtp(s, c) })
+		api.POST("/signup/submit_otp", func(c *gin.Context) { restSignUpSubmitOtp(s, c) })
 		api.GET("/login", func(c *gin.Context) { restGetLoginAccount(s, c) })
 		api.POST("/login", func(c *gin.Context) { restLogin(s, c) })
 		api.DELETE("/login", func(c *gin.Context) { restSignOut(s, c) })

@@ -75,7 +75,7 @@ function PriorityTag(props: { priority: number }) {
   );
 }
 function site(s: number): string {
-  for (const {name, id} of sites) {
+  for (const { name, id } of sites) {
     if (id === s) {
       return name
     }
@@ -204,43 +204,43 @@ function ReservationDetail(props: {
                 if (passwd === undefined) {
                   return;
                 }
-                
+
                 try {
                   await request("/authorization", "POST", {}, {
-                      Uid: props.status.Uid,
-                      Passwd: passwd
-                  }) 
+                    Uid: props.status.Uid,
+                    Passwd: passwd
+                  })
                   await dialog("Info", "Info", "Authorized successfully.");
                   props.update()
                 } catch (e) {
                   if (e instanceof RequestErr) {
-                      await dialog("Info", "Error", e.message)
+                    await dialog("Info", "Error", e.message)
                   } else {
-                      await dialog("Info", "Error", String(e))
+                    await dialog("Info", "Error", String(e))
                   }
                 }
               }}>
               Authorize
             </button>}
             <button
-                className="h-7 w-7 p-2 ml-2 inline-flex bg-red-600 rounded-full"
-                onClick={async (e) => {
-                  e.preventDefault();
-                  if (
-                    await dialog(
-                      "Confirm",
-                      "Cancel reservation",
-                      "Do you really want to cancel the reservation?"
-                    )
-                  ) {
-                    await cancelReservation(
-                      props.status.Uid,
-                      props.setErrorMsg,
-                      props.setResList
-                    );
-                  }
-                }}
-              >
+              className="h-7 w-7 p-2 ml-2 inline-flex bg-red-600 rounded-full"
+              onClick={async (e) => {
+                e.preventDefault();
+                if (
+                  await dialog(
+                    "Confirm",
+                    "Cancel reservation",
+                    "Do you really want to cancel the reservation?"
+                  )
+                ) {
+                  await cancelReservation(
+                    props.status.Uid,
+                    props.setErrorMsg,
+                    props.setResList
+                  );
+                }
+              }}
+            >
               <img src={trashcan} alt="Delete" className="" />
             </button>
           </div>
@@ -419,16 +419,5 @@ function Dashboard(props: { user: string }) {
 }
 
 export default function DashboardPage() {
-    const [user, setUser] = useState("ERROR not set");
-    const [_, setNetId] = useState("ERROR not set");
-    useEffect(() => {
-      request("/login", "GET")
-        .catch(() => (window.location.href = "/"))
-        .then((resp) => {
-          const { User, NetId } = resp;
-          setUser(User);
-          setNetId(NetId);
-        });
-    }, []);
-  return <App><Dashboard user={user}></Dashboard></App>
+  return <App>{({ user }) => <Dashboard user={user}></Dashboard>}</App>
 }
