@@ -33,6 +33,7 @@ type Session struct {
 
 type SessionManager struct {
 	sessions           sync.Map
+	signupSessions     sync.Map
 	conn               *sql.Conn
 	timeZone           *time.Location
 	captchaSolver      captcha_solver.CaptchaSolver
@@ -58,6 +59,7 @@ func NewSessionManager(conn *sql.Conn, captcha_solver captcha_solver.CaptchaSolv
 	// Users are queried for each login. Not load into memory now.
 	return &SessionManager{
 		sessions:           sync.Map{},
+		signupSessions:     sync.Map{},
 		conn:               conn,
 		timeZone:           time_zone,
 		captchaSolver:      captcha_solver,
@@ -154,43 +156,223 @@ func (t *SessionManager) CheckInvitation(params *CheckInvitationParams) (bool, e
 	return count != 0, nil
 }
 
+type VerifyNetIdParams struct {
+	NetId       string
+	NetIdPasswd string
+}
+
 type SignUpParams struct {
 	User           string
 	Passwd         string
-	NetId          string
-	NetIdPasswd    string
 	PaymentPasswd  *string
 	InvitationCode string
+	VerificationId string
 }
 
-func (t *SessionManager) SignUp(params *SignUpParams) (SessionId, error) {
+type SignUpResponse struct {
+	SessionId    SessionId `json:"sessionId,omitempty"`
+	MfaRequired  bool      `json:"mfaRequired"`
+	MfaSessionId string    `json:"mfaSessionId,omitempty"`
+	Phone        string    `json:"phone,omitempty"`
+}
+
+type SignupSession struct {
+	NetId       string
+	NetIdPasswd string
+	Phone       string
+	Verified    bool
+	SendOtp     func() error
+	OtpChan     chan string
+	ResultChan  chan error
+	CreatedAt   time.Time
+}
+
+func (t *SessionManager) VerifyNetId(params *VerifyNetIdParams) (SignUpResponse, error) {
+	// Clean up expired sessions first
+	t.signupSessions.Range(func(key, value interface{}) bool {
+		sess := value.(*SignupSession)
+		if time.Since(sess.CreatedAt) > 5*time.Minute {
+			select {
+			case sess.OtpChan <- "":
+			default:
+			}
+			t.signupSessions.Delete(key)
+		}
+		return true
+	})
+
+	var loginURL string
+	if t.reserverPlugin != nil {
+		loginURL = t.reserverPlugin.LoginURL
+	} else {
+		loginURL = "https://lms.xjtu.edu.cn/"
+		// return SignUpResponse{}, constant.TennisApiError{ErrorType: constant.InternalServerError, Message: "Reserver plugin is not loaded, NetID validation is unavailable"}
+	}
+
+	mfaSessionIdBytes := make([]byte, 16)
+	if _, randErr := rand.Read(mfaSessionIdBytes); randErr != nil {
+		return SignUpResponse{}, constant.TennisApiError{ErrorType: constant.InternalServerError, Message: randErr.Error()}
+	}
+	mfaSessionId := base32.StdEncoding.EncodeToString(mfaSessionIdBytes)
+
+	otpChan := make(chan string)
+	resultChan := make(chan error, 1)
+	mfaPromptChan := make(chan string, 1)
+
+	session := &SignupSession{
+		NetId:       params.NetId,
+		NetIdPasswd: params.NetIdPasswd,
+		OtpChan:     otpChan,
+		ResultChan:  resultChan,
+		CreatedAt:   time.Now(),
+	}
+	t.signupSessions.Store(mfaSessionId, session)
+
+	go func() {
+		mfaHandler := func(phone string, send_otp func() error) (otp string, trust_device bool, err error) {
+			session.Phone = phone
+			session.SendOtp = send_otp
+			mfaPromptChan <- phone
+
+			select {
+			case otp = <-otpChan:
+				if otp == "" {
+					return "", false, fmt.Errorf("OTP registration cancelled")
+				}
+				return otp, true, nil
+			case <-time.After(5 * time.Minute):
+				return "", false, fmt.Errorf("OTP timeout")
+			}
+		}
+
+		_, loginErr := xjtulogin.Login(loginURL, params.NetId, params.NetIdPasswd, mfaHandler)
+		if loginErr != nil {
+			resultChan <- loginErr
+			return
+		}
+
+		resultChan <- nil
+	}()
+
+	select {
+	case phone := <-mfaPromptChan:
+		return SignUpResponse{
+			MfaRequired:  true,
+			MfaSessionId: mfaSessionId,
+			Phone:        phone,
+		}, nil
+	case err := <-resultChan:
+		if err != nil {
+			t.signupSessions.Delete(mfaSessionId)
+			return SignUpResponse{}, constant.TennisApiError{ErrorType: constant.InvalidAccount, Message: fmt.Sprintf("NetID Login failed: %s", err.Error())}
+		}
+		session.Verified = true
+		return SignUpResponse{
+			MfaRequired:  false,
+			MfaSessionId: mfaSessionId,
+		}, nil
+	case <-time.After(15 * time.Second):
+		return SignUpResponse{}, fmt.Errorf("login response timeout")
+	}
+}
+
+func (t *SessionManager) SignUp(params *SignUpParams) (SignUpResponse, error) {
 	invited, err := t.CheckInvitation(&CheckInvitationParams{Code: params.InvitationCode})
 	if err != nil {
-		return "", err
+		return SignUpResponse{}, err
 	}
 	if !invited {
-		return "", constant.TennisApiError{ErrorType: constant.InvalidQuery, Message: "Invitation Code Error"}
+		return SignUpResponse{}, constant.TennisApiError{ErrorType: constant.InvalidQuery, Message: "Invitation Code Error"}
 	}
-	// check if new_passwd is valid
 	if !CheckPasswd(params.Passwd) {
-		return "", constant.TennisApiError{ErrorType: constant.InvalidPasswd}
+		return SignUpResponse{}, constant.TennisApiError{ErrorType: constant.InvalidPasswd}
 	}
-	// delete from invitations table.
+
+	val, ok := t.signupSessions.Load(params.VerificationId)
+	if !ok {
+		return SignUpResponse{}, constant.TennisApiError{ErrorType: constant.InvalidQuery, Message: "Invalid or expired NetID verification session"}
+	}
+	session := val.(*SignupSession)
+	if !session.Verified {
+		return SignUpResponse{}, constant.TennisApiError{ErrorType: constant.InvalidQuery, Message: "NetID verification is not completed yet"}
+	}
+
+	new_user, err := auth.RegisterUser(t.conn, params.User, params.Passwd, session.NetId, session.NetIdPasswd, params.PaymentPasswd)
+	if err != nil {
+		return SignUpResponse{}, constant.TennisApiError{ErrorType: constant.InternalServerError, Message: fmt.Sprintf("Cannot register the user because of Server Error: %s", err.Error())}
+	}
+
 	_, err = t.conn.ExecContext(context.Background(), "DELETE FROM `invitations` WHERE `code` = ?", params.InvitationCode)
 	if err != nil {
-		return "", constant.TennisApiError{ErrorType: constant.InternalServerError, Message: err.Error()}
+		fmt.Fprintf(os.Stderr, "[Warning] Failed to delete invitation code: %v\n", err)
 	}
-	new_user, err := auth.RegisterUser(t.conn, params.User, params.Passwd, params.NetId, params.NetIdPasswd, params.PaymentPasswd)
-	if err != nil {
-		return "", constant.TennisApiError{ErrorType: constant.InternalServerError, Message: fmt.Sprintf("Cannot register the user because of Server Error: %s. We are sorry that it is our fault, but please contact the administrator to get a new invitation code for next sign up trial.", err.Error())}
-	}
-	session_id := newSessionId()
 
+	t.signupSessions.Delete(params.VerificationId)
+
+	session_id := newSessionId()
 	t.sessions.Store(session_id, Session{
 		Expiry: time.Now().Add(account_login_expiry),
 		User:   &new_user,
 	})
-	return session_id, nil
+
+	return SignUpResponse{
+		SessionId: session_id,
+	}, nil
+}
+
+type SignUpSendOtpParams struct {
+	MfaSessionId string
+}
+
+func (t *SessionManager) SignUpSendOtp(params *SignUpSendOtpParams) (interface{}, error) {
+	val, ok := t.signupSessions.Load(params.MfaSessionId)
+	if !ok {
+		return nil, constant.TennisApiError{ErrorType: constant.InvalidQuery, Message: "Invalid or expired MFA session"}
+	}
+	session := val.(*SignupSession)
+	if session.SendOtp == nil {
+		return nil, constant.TennisApiError{ErrorType: constant.InvalidQuery, Message: "Send OTP not ready or already sent"}
+	}
+	err := session.SendOtp()
+	if err != nil {
+		return nil, constant.TennisApiError{ErrorType: constant.InternalServerError, Message: err.Error()}
+	}
+	return nil, nil
+}
+
+type SignUpSubmitOtpParams struct {
+	MfaSessionId string
+	Otp          string
+}
+
+func (t *SessionManager) SignUpSubmitOtp(params *SignUpSubmitOtpParams) (SignUpResponse, error) {
+	val, ok := t.signupSessions.Load(params.MfaSessionId)
+	if !ok {
+		return SignUpResponse{}, constant.TennisApiError{ErrorType: constant.InvalidQuery, Message: "Invalid or expired MFA session"}
+	}
+	session := val.(*SignupSession)
+
+	select {
+	case session.OtpChan <- params.Otp:
+	default:
+		return SignUpResponse{}, constant.TennisApiError{ErrorType: constant.InvalidQuery, Message: "OTP channel not ready"}
+	}
+
+	select {
+	case err := <-session.ResultChan:
+		if err != nil {
+			t.signupSessions.Delete(params.MfaSessionId)
+			return SignUpResponse{}, constant.TennisApiError{ErrorType: constant.InvalidAccount, Message: fmt.Sprintf("NetID Login failed: %s", err.Error())}
+		}
+		session.Verified = true
+		return SignUpResponse{
+			MfaRequired:  false,
+			MfaSessionId: params.MfaSessionId,
+		}, nil
+	case <-time.After(3 * time.Minute):
+		t.signupSessions.Delete(params.MfaSessionId)
+		return SignUpResponse{}, constant.TennisApiError{ErrorType: constant.InternalServerError, Message: "OTP verification timeout"}
+	}
 }
 
 type LoginParams struct {
@@ -267,11 +449,10 @@ func (t *SessionManager) ChangePasswd(params *ChangePasswdParams) error {
 }
 
 type ChangeIdentityParams struct {
-	Session       SessionId
-	Passwd        string
-	NetId         *string
-	NetIdPasswd   *string
-	PaymentPasswd *string
+	Session        SessionId
+	Passwd         string
+	VerificationId *string
+	PaymentPasswd  *string
 }
 
 func (t *SessionManager) ChangeIdentity(params *ChangeIdentityParams) error {
@@ -279,22 +460,30 @@ func (t *SessionManager) ChangeIdentity(params *ChangeIdentityParams) error {
 	if err != nil {
 		return err
 	}
-	// check if new_passwd is valid
-	if params.NetIdPasswd != nil && !CheckPasswd(*params.NetIdPasswd) {
-		return constant.TennisApiError{ErrorType: constant.InvalidPasswd}
-	}
 
 	// decrypt and reencrypt data
 	authorization, err := account.DecryptUserData(params.Passwd)
 	if err != nil {
 		return constant.TennisApiError{ErrorType: constant.WrongPasswd}
 	}
-	if params.NetId != nil {
-		authorization.NetId = *params.NetId
+
+	if params.VerificationId != nil {
+		val, ok := t.signupSessions.Load(*params.VerificationId)
+		if !ok {
+			return constant.TennisApiError{ErrorType: constant.InvalidQuery, Message: "Invalid or expired NetID verification session"}
+		}
+		session := val.(*SignupSession)
+		if !session.Verified {
+			return constant.TennisApiError{ErrorType: constant.InvalidQuery, Message: "NetID verification is not completed yet"}
+		}
+
+		authorization.NetId = session.NetId
+		authorization.NetIdPasswd = auth.Decrypted(session.NetIdPasswd)
+
+		// delete verification session
+		t.signupSessions.Delete(*params.VerificationId)
 	}
-	if params.NetIdPasswd != nil {
-		authorization.NetIdPasswd = auth.Decrypted(*params.NetIdPasswd)
-	}
+
 	if params.PaymentPasswd != nil {
 		authorization.PaymentPasswd = auth.Decrypted(*params.PaymentPasswd)
 	}
@@ -313,7 +502,7 @@ func (t *SessionManager) ChangeIdentity(params *ChangeIdentityParams) error {
 func (t *SessionManager) WriteAccounts(new_account auth.User, account *auth.User) error {
 
 	// Write back to user database
-	_, err := t.conn.ExecContext(context.Background(), "UPDATE `users` SET `password` = ?, `salt` = ?, `netid_passwd` = ?, `payment_passwd` = ? WHERE `user` = ?",
+	_, err := t.conn.ExecContext(context.Background(), "UPDATE `users` SET `passwd` = ?, `salt` = ?, `netid_passwd` = ?, `payment_passwd` = ? WHERE `user` = ?",
 		new_account.Passwd, new_account.Salt, new_account.NetIdPasswd, new_account.PaymentPasswd, new_account.User)
 
 	if err != nil {
@@ -520,7 +709,7 @@ func (t *SessionManager) Authorize(params *AuthorizeParams) error {
 
 	if now.After(reservation_booking_start) && now.After(today_booking_start) && now.Before(today_booking_end) {
 		go (func() {
-			redir, err := xjtulogin.Login(t.reserverPlugin.LoginURL, authorization.NetId, string(authorization.NetIdPasswd))
+			redir, err := xjtulogin.LoginNoninteractive(t.reserverPlugin.LoginURL, authorization.NetId, string(authorization.NetIdPasswd))
 
 			// cannot login, return all failed.
 			// reuse login

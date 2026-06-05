@@ -1,5 +1,5 @@
 export interface Preference {
-    
+
     StartTimeSec: number,
     DurationSec: number,
     CourtNamePreference: string[],
@@ -36,7 +36,7 @@ export function defaultPreference(): Preference {
 }
 export class IdClosure {
     private static id: number = 0;
-    static getNewIdPref(): {id: number, pref: Preference} {
+    static getNewIdPref(): { id: number, pref: Preference } {
         return {
             id: IdClosure.id++,
             pref: defaultPreference()

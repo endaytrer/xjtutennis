@@ -2,12 +2,12 @@ const baseUrl = "/api"
 
 interface StandardResponse {
     Success: boolean;
-    Code:    number;
+    Code: number;
     Message: string;
-    Data?:   any;
+    Data?: any;
 }
 export class RequestErr extends Error {
-    code:    number;
+    code: number;
     message: string;
     constructor(code: number, message: string) {
         super();
@@ -15,7 +15,7 @@ export class RequestErr extends Error {
         this.message = message
     }
 }
-export async function request(url: string, method: "GET" | "POST" | "PUT" | "DELETE", query?: Record<string, string> , data?: object): Promise<any> {
+export async function request(url: string, method: "GET" | "POST" | "PUT" | "DELETE", query?: Record<string, string>, data?: object): Promise<any> {
     let requestUrl = baseUrl + url;
     const headers = new Headers();
     let body: string | undefined;
@@ -30,7 +30,7 @@ export async function request(url: string, method: "GET" | "POST" | "PUT" | "DEL
             body = JSON.stringify(data)
         }
     }
-    
+
     const response = await fetch(requestUrl, {
         method,
         headers,
